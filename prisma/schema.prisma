@@ -12,25 +12,25 @@ generator client {
 // ==========================================
 
 model Company {
-  id        String    @id @default(uuid())
-  name      String
-  email     String?
-  phone     String?
-  gstin     String?
-  address   String?
-  
+  id      String  @id @default(uuid())
+  name    String
+  email   String?
+  phone   String?
+  gstin   String?
+  address String?
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
   version   Int       @default(1)
   deviceId  String?
 
-  branches  Branch[]
-  users     User[]
+  branches Branch[]
+  users    User[]
 }
 
 model Branch {
-  id        String    @id @default(uuid())
+  id        String  @id @default(uuid())
   companyId String
   name      String
   code      String?
@@ -53,11 +53,11 @@ model Branch {
 }
 
 model Warehouse {
-  id        String    @id @default(uuid())
-  branchId  String
-  name      String
-  code      String?
-  address   String?
+  id       String  @id @default(uuid())
+  branchId String
+  name     String
+  code     String?
+  address  String?
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -65,18 +65,18 @@ model Warehouse {
   version   Int       @default(1)
   deviceId  String?
 
-  branch           Branch             @relation(fields: [branchId], references: [id])
-  purchases        Purchase[]
-  sales            Sale[]
-  stockBalances    StockBalance[]
+  branch            Branch             @relation(fields: [branchId], references: [id])
+  purchases         Purchase[]
+  sales             Sale[]
+  stockBalances     StockBalance[]
   stockTransactions StockTransaction[]
 }
 
 model Device {
-  id          String    @id @default(uuid())
+  id          String  @id @default(uuid())
   branchId    String?
   name        String
-  deviceToken String?   @unique
+  deviceToken String? @unique
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -84,20 +84,20 @@ model Device {
   version   Int       @default(1)
   deviceId  String?
 
-  branch      Branch?   @relation(fields: [branchId], references: [id])
+  branch Branch? @relation(fields: [branchId], references: [id])
 }
 
 model User {
-  id           String    @id @default(uuid())
+  id           String  @id @default(uuid())
   companyId    String
   branchId     String?
   roleId       String
-  username     String    @unique
+  username     String  @unique
   passwordHash String
   fullName     String
   email        String?
   phone        String?
-  isActive     Boolean   @default(true)
+  isActive     Boolean @default(true)
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -105,16 +105,16 @@ model User {
   version   Int       @default(1)
   deviceId  String?
 
-  company      Company    @relation(fields: [companyId], references: [id])
-  branch       Branch?    @relation(fields: [branchId], references: [id])
-  role         Role       @relation(fields: [roleId], references: [id])
-  auditLogs    AuditLog[]
-  expenses     Expense[]
+  company       Company        @relation(fields: [companyId], references: [id])
+  branch        Branch?        @relation(fields: [branchId], references: [id])
+  role          Role           @relation(fields: [roleId], references: [id])
+  auditLogs     AuditLog[]
+  expenses      Expense[]
   refreshTokens RefreshToken[]
 }
 
 model Role {
-  id          String    @id @default(uuid())
+  id          String  @id @default(uuid())
   name        String
   description String?
 
@@ -129,7 +129,7 @@ model Role {
 }
 
 model Permission {
-  id          String    @id @default(uuid())
+  id          String  @id @default(uuid())
   action      String
   description String?
 
@@ -139,11 +139,11 @@ model Permission {
   version   Int       @default(1)
   deviceId  String?
 
-  roles       RolePermission[]
+  roles RolePermission[]
 }
 
 model RolePermission {
-  id           String    @id @default(uuid())
+  id           String @id @default(uuid())
   roleId       String
   permissionId String
 
@@ -153,9 +153,9 @@ model RolePermission {
   version   Int       @default(1)
   deviceId  String?
 
-  role         Role       @relation(fields: [roleId], references: [id])
-  permission   Permission @relation(fields: [permissionId], references: [id])
-  
+  role       Role       @relation(fields: [roleId], references: [id])
+  permission Permission @relation(fields: [permissionId], references: [id])
+
   @@unique([roleId, permissionId])
 }
 
@@ -164,7 +164,7 @@ model RolePermission {
 // ==========================================
 
 model Category {
-  id          String    @id @default(uuid())
+  id          String  @id @default(uuid())
   name        String
   description String?
 
@@ -179,7 +179,7 @@ model Category {
 }
 
 model SubCategory {
-  id          String    @id @default(uuid())
+  id          String  @id @default(uuid())
   categoryId  String
   name        String
   description String?
@@ -190,12 +190,12 @@ model SubCategory {
   version   Int       @default(1)
   deviceId  String?
 
-  category    Category  @relation(fields: [categoryId], references: [id])
-  products    Product[]
+  category Category  @relation(fields: [categoryId], references: [id])
+  products Product[]
 }
 
 model Brand {
-  id          String    @id @default(uuid())
+  id          String  @id @default(uuid())
   name        String
   description String?
 
@@ -205,11 +205,11 @@ model Brand {
   version   Int       @default(1)
   deviceId  String?
 
-  products    Product[]
+  products Product[]
 }
 
 model Unit {
-  id        String    @id @default(uuid())
+  id        String @id @default(uuid())
   name      String
   shortName String
 
@@ -219,17 +219,17 @@ model Unit {
   version   Int       @default(1)
   deviceId  String?
 
-  baseProducts Product[]     @relation("ProductBaseUnit")
-  productUnits ProductUnit[]
+  baseProducts      Product[]          @relation("ProductBaseUnit")
+  productUnits      ProductUnit[]
   stockTransactions StockTransaction[]
 }
 
 model TaxRate {
-  id        String    @id @default(uuid())
-  name      String
-  cgstRate  Decimal   @db.Decimal(5, 2)
-  sgstRate  Decimal   @db.Decimal(5, 2)
-  igstRate  Decimal   @db.Decimal(5, 2)
+  id       String  @id @default(uuid())
+  name     String
+  cgstRate Decimal @db.Decimal(5, 2)
+  sgstRate Decimal @db.Decimal(5, 2)
+  igstRate Decimal @db.Decimal(5, 2)
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -237,7 +237,7 @@ model TaxRate {
   version   Int       @default(1)
   deviceId  String?
 
-  products  Product[]
+  products Product[]
 }
 
 enum TaxType {
@@ -246,7 +246,7 @@ enum TaxType {
 }
 
 model Product {
-  id                    String    @id @default(uuid())
+  id                    String  @id @default(uuid())
   categoryId            String?
   subCategoryId         String?
   brandId               String?
@@ -254,24 +254,24 @@ model Product {
   baseUnitId            String
   defaultPurchaseUnitId String?
   defaultSalesUnitId    String?
-  
-  name                  String
-  productCode           String    @unique
-  sku                   String    @unique
-  barcode               String?   @unique
-  description           String?
-  hsnCode               String?
-  
-  taxType               TaxType   @default(GST)
-  isPriceInclusive      Boolean   @default(false)
-  isActive              Boolean   @default(true)
-  
-  batchTracking         Boolean   @default(false)
-  expiryTracking        Boolean   @default(false)
-  serialTracking        Boolean   @default(false)
-  
-  lowStockLevel         Decimal?  @db.Decimal(12, 4)
-  reorderLevel          Decimal?  @db.Decimal(12, 4)
+
+  name        String
+  productCode String  @unique
+  sku         String  @unique
+  barcode     String? @unique
+  description String?
+  hsnCode     String?
+
+  taxType          TaxType @default(GST)
+  isPriceInclusive Boolean @default(false)
+  isActive         Boolean @default(true)
+
+  batchTracking  Boolean @default(false)
+  expiryTracking Boolean @default(false)
+  serialTracking Boolean @default(false)
+
+  lowStockLevel Decimal? @db.Decimal(12, 4)
+  reorderLevel  Decimal? @db.Decimal(12, 4)
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -279,28 +279,30 @@ model Product {
   version   Int       @default(1)
   deviceId  String?
 
-  category              Category?    @relation(fields: [categoryId], references: [id])
-  subCategory           SubCategory? @relation(fields: [subCategoryId], references: [id])
-  brand                 Brand?       @relation(fields: [brandId], references: [id])
-  taxRate               TaxRate?     @relation(fields: [taxRateId], references: [id])
-  baseUnit              Unit         @relation("ProductBaseUnit", fields: [baseUnitId], references: [id])
-  
-  defaultPurchaseUnit   ProductUnit? @relation("DefaultPurchaseUnit", fields: [defaultPurchaseUnitId], references: [id])
-  defaultSalesUnit      ProductUnit? @relation("DefaultSalesUnit", fields: [defaultSalesUnitId], references: [id])
+  category    Category?    @relation(fields: [categoryId], references: [id])
+  subCategory SubCategory? @relation(fields: [subCategoryId], references: [id])
+  brand       Brand?       @relation(fields: [brandId], references: [id])
+  taxRate     TaxRate?     @relation(fields: [taxRateId], references: [id])
+  baseUnit    Unit         @relation("ProductBaseUnit", fields: [baseUnitId], references: [id])
 
-  productUnits          ProductUnit[] @relation("ProductToUnits")
-  prices                ProductPrice[]
-  purchaseItems         PurchaseItem[]
-  saleItems             SaleItem[]
-  stockBalances         StockBalance[]
-  stockTransactions     StockTransaction[]
+  defaultPurchaseUnit ProductUnit? @relation("DefaultPurchaseUnit", fields: [defaultPurchaseUnitId], references: [id])
+  defaultSalesUnit    ProductUnit? @relation("DefaultSalesUnit", fields: [defaultSalesUnitId], references: [id])
+
+  productUnits      ProductUnit[]      @relation("ProductToUnits")
+  prices            ProductPrice[]
+  purchaseItems     PurchaseItem[]
+  saleItems         SaleItem[]
+  stockBalances     StockBalance[]
+  stockTransactions StockTransaction[]
+  
+  @@index([name])
 }
 
 model ProductUnit {
-  id               String    @id @default(uuid())
+  id               String  @id @default(uuid())
   productId        String
   unitId           String
-  conversionFactor Decimal   @db.Decimal(10, 4)
+  conversionFactor Decimal @db.Decimal(10, 4)
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -308,25 +310,25 @@ model ProductUnit {
   version   Int       @default(1)
   deviceId  String?
 
-  product          Product   @relation("ProductToUnits", fields: [productId], references: [id])
-  unit             Unit      @relation(fields: [unitId], references: [id])
-  
+  product Product @relation("ProductToUnits", fields: [productId], references: [id])
+  unit    Unit    @relation(fields: [unitId], references: [id])
+
   defaultForPurchaseProducts Product[] @relation("DefaultPurchaseUnit")
   defaultForSalesProducts    Product[] @relation("DefaultSalesUnit")
 
-  prices           ProductPrice[]
-  purchaseItems    PurchaseItem[]
-  saleItems        SaleItem[]
-  
+  prices        ProductPrice[]
+  purchaseItems PurchaseItem[]
+  saleItems     SaleItem[]
+
   @@unique([productId, unitId])
 }
 
 model ProductPrice {
-  id            String    @id @default(uuid())
+  id            String  @id @default(uuid())
   productId     String
   productUnitId String
   priceType     String
-  price         Decimal   @db.Decimal(12, 2)
+  price         Decimal @db.Decimal(12, 2)
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -334,9 +336,9 @@ model ProductPrice {
   version   Int       @default(1)
   deviceId  String?
 
-  product       Product      @relation(fields: [productId], references: [id])
-  productUnit   ProductUnit  @relation(fields: [productUnitId], references: [id])
-  
+  product     Product     @relation(fields: [productId], references: [id])
+  productUnit ProductUnit @relation(fields: [productUnitId], references: [id])
+
   @@unique([productId, productUnitId, priceType])
 }
 
@@ -345,13 +347,13 @@ model ProductPrice {
 // ==========================================
 
 model Customer {
-  id            String    @id @default(uuid())
-  name          String
-  phone         String?
-  email         String?
-  address       String?
-  gstin         String?
-  creditLimit   Decimal?  @db.Decimal(12, 2)
+  id          String   @id @default(uuid())
+  name        String
+  phone       String?
+  email       String?
+  address     String?
+  gstin       String?
+  creditLimit Decimal? @db.Decimal(12, 2)
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -359,16 +361,16 @@ model Customer {
   version   Int       @default(1)
   deviceId  String?
 
-  sales         Sale[]
+  sales Sale[]
 }
 
 model Supplier {
-  id            String    @id @default(uuid())
-  name          String
-  phone         String?
-  email         String?
-  address       String?
-  gstin         String?
+  id      String  @id @default(uuid())
+  name    String
+  phone   String?
+  email   String?
+  address String?
+  gstin   String?
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -376,7 +378,7 @@ model Supplier {
   version   Int       @default(1)
   deviceId  String?
 
-  purchases     Purchase[]
+  purchases Purchase[]
 }
 
 // ==========================================
@@ -384,18 +386,18 @@ model Supplier {
 // ==========================================
 
 model Purchase {
-  id            String    @id @default(uuid())
+  id            String   @id @default(uuid())
   branchId      String
   warehouseId   String
   supplierId    String
   invoiceNumber String
   purchaseDate  DateTime
   status        String
-  
-  subTotal      Decimal   @db.Decimal(12, 2)
-  taxTotal      Decimal   @db.Decimal(12, 2)
-  discountTotal Decimal   @db.Decimal(12, 2)
-  grandTotal    Decimal   @db.Decimal(12, 2)
+
+  subTotal      Decimal @db.Decimal(12, 2)
+  taxTotal      Decimal @db.Decimal(12, 2)
+  discountTotal Decimal @db.Decimal(12, 2)
+  grandTotal    Decimal @db.Decimal(12, 2)
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -403,25 +405,25 @@ model Purchase {
   version   Int       @default(1)
   deviceId  String?
 
-  branch        Branch      @relation(fields: [branchId], references: [id])
-  warehouse     Warehouse   @relation(fields: [warehouseId], references: [id])
-  supplier      Supplier    @relation(fields: [supplierId], references: [id])
-  items         PurchaseItem[]
-  payments      PurchasePayment[]
-  returns       PurchaseReturn[]
+  branch    Branch            @relation(fields: [branchId], references: [id])
+  warehouse Warehouse         @relation(fields: [warehouseId], references: [id])
+  supplier  Supplier          @relation(fields: [supplierId], references: [id])
+  items     PurchaseItem[]
+  payments  PurchasePayment[]
+  returns   PurchaseReturn[]
 }
 
 model PurchaseItem {
-  id            String    @id @default(uuid())
+  id            String @id @default(uuid())
   purchaseId    String
   productId     String
   productUnitId String
-  
-  quantity      Decimal   @db.Decimal(12, 4)
-  unitPrice     Decimal   @db.Decimal(12, 2)
-  discount      Decimal   @db.Decimal(12, 2)
-  taxAmount     Decimal   @db.Decimal(12, 2)
-  total         Decimal   @db.Decimal(12, 2)
+
+  quantity  Decimal @db.Decimal(12, 4)
+  unitPrice Decimal @db.Decimal(12, 2)
+  discount  Decimal @db.Decimal(12, 2)
+  taxAmount Decimal @db.Decimal(12, 2)
+  total     Decimal @db.Decimal(12, 2)
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -429,15 +431,15 @@ model PurchaseItem {
   version   Int       @default(1)
   deviceId  String?
 
-  purchase      Purchase    @relation(fields: [purchaseId], references: [id])
-  product       Product     @relation(fields: [productId], references: [id])
-  productUnit   ProductUnit @relation(fields: [productUnitId], references: [id])
+  purchase    Purchase    @relation(fields: [purchaseId], references: [id])
+  product     Product     @relation(fields: [productId], references: [id])
+  productUnit ProductUnit @relation(fields: [productUnitId], references: [id])
 }
 
 model PurchasePayment {
-  id            String    @id @default(uuid())
-  purchaseId    String
-  paymentId     String
+  id         String @id @default(uuid())
+  purchaseId String
+  paymentId  String
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -445,16 +447,16 @@ model PurchasePayment {
   version   Int       @default(1)
   deviceId  String?
 
-  purchase      Purchase    @relation(fields: [purchaseId], references: [id])
-  payment       Payment     @relation(fields: [paymentId], references: [id])
+  purchase Purchase @relation(fields: [purchaseId], references: [id])
+  payment  Payment  @relation(fields: [paymentId], references: [id])
 }
 
 model PurchaseReturn {
-  id            String    @id @default(uuid())
-  purchaseId    String
-  returnDate    DateTime
-  reason        String?
-  totalAmount   Decimal   @db.Decimal(12, 2)
+  id          String   @id @default(uuid())
+  purchaseId  String
+  returnDate  DateTime
+  reason      String?
+  totalAmount Decimal  @db.Decimal(12, 2)
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -462,22 +464,22 @@ model PurchaseReturn {
   version   Int       @default(1)
   deviceId  String?
 
-  purchase      Purchase    @relation(fields: [purchaseId], references: [id])
+  purchase Purchase @relation(fields: [purchaseId], references: [id])
 }
 
 model Sale {
-  id            String    @id @default(uuid())
+  id            String   @id @default(uuid())
   branchId      String
   warehouseId   String
   customerId    String
-  invoiceNumber String    @unique
+  invoiceNumber String   @unique
   saleDate      DateTime
   status        String
-  
-  subTotal      Decimal   @db.Decimal(12, 2)
-  taxTotal      Decimal   @db.Decimal(12, 2)
-  discountTotal Decimal   @db.Decimal(12, 2)
-  grandTotal    Decimal   @db.Decimal(12, 2)
+
+  subTotal      Decimal @db.Decimal(12, 2)
+  taxTotal      Decimal @db.Decimal(12, 2)
+  discountTotal Decimal @db.Decimal(12, 2)
+  grandTotal    Decimal @db.Decimal(12, 2)
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -485,25 +487,25 @@ model Sale {
   version   Int       @default(1)
   deviceId  String?
 
-  branch        Branch      @relation(fields: [branchId], references: [id])
-  warehouse     Warehouse   @relation(fields: [warehouseId], references: [id])
-  customer      Customer    @relation(fields: [customerId], references: [id])
-  items         SaleItem[]
-  payments      SalePayment[]
-  returns       SaleReturn[]
+  branch    Branch        @relation(fields: [branchId], references: [id])
+  warehouse Warehouse     @relation(fields: [warehouseId], references: [id])
+  customer  Customer      @relation(fields: [customerId], references: [id])
+  items     SaleItem[]
+  payments  SalePayment[]
+  returns   SaleReturn[]
 }
 
 model SaleItem {
-  id            String    @id @default(uuid())
+  id            String @id @default(uuid())
   saleId        String
   productId     String
   productUnitId String
-  
-  quantity      Decimal   @db.Decimal(12, 4)
-  unitPrice     Decimal   @db.Decimal(12, 2)
-  discount      Decimal   @db.Decimal(12, 2)
-  taxAmount     Decimal   @db.Decimal(12, 2)
-  total         Decimal   @db.Decimal(12, 2)
+
+  quantity  Decimal @db.Decimal(12, 4)
+  unitPrice Decimal @db.Decimal(12, 2)
+  discount  Decimal @db.Decimal(12, 2)
+  taxAmount Decimal @db.Decimal(12, 2)
+  total     Decimal @db.Decimal(12, 2)
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -511,15 +513,15 @@ model SaleItem {
   version   Int       @default(1)
   deviceId  String?
 
-  sale          Sale        @relation(fields: [saleId], references: [id])
-  product       Product     @relation(fields: [productId], references: [id])
-  productUnit   ProductUnit @relation(fields: [productUnitId], references: [id])
+  sale        Sale        @relation(fields: [saleId], references: [id])
+  product     Product     @relation(fields: [productId], references: [id])
+  productUnit ProductUnit @relation(fields: [productUnitId], references: [id])
 }
 
 model SalePayment {
-  id            String    @id @default(uuid())
-  saleId        String
-  paymentId     String
+  id        String @id @default(uuid())
+  saleId    String
+  paymentId String
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -527,16 +529,16 @@ model SalePayment {
   version   Int       @default(1)
   deviceId  String?
 
-  sale          Sale        @relation(fields: [saleId], references: [id])
-  payment       Payment     @relation(fields: [paymentId], references: [id])
+  sale    Sale    @relation(fields: [saleId], references: [id])
+  payment Payment @relation(fields: [paymentId], references: [id])
 }
 
 model SaleReturn {
-  id            String    @id @default(uuid())
-  saleId        String
-  returnDate    DateTime
-  reason        String?
-  totalAmount   Decimal   @db.Decimal(12, 2)
+  id          String   @id @default(uuid())
+  saleId      String
+  returnDate  DateTime
+  reason      String?
+  totalAmount Decimal  @db.Decimal(12, 2)
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -544,14 +546,14 @@ model SaleReturn {
   version   Int       @default(1)
   deviceId  String?
 
-  sale          Sale        @relation(fields: [saleId], references: [id])
+  sale Sale @relation(fields: [saleId], references: [id])
 }
 
 model Payment {
-  id            String    @id @default(uuid())
-  paymentDate   DateTime
-  amount        Decimal   @db.Decimal(12, 2)
-  paymentMethod String
+  id              String   @id @default(uuid())
+  paymentDate     DateTime
+  amount          Decimal  @db.Decimal(12, 2)
+  paymentMethod   String
   referenceNumber String?
 
   createdAt DateTime  @default(now())
@@ -565,13 +567,13 @@ model Payment {
 }
 
 model Expense {
-  id            String    @id @default(uuid())
-  branchId      String
-  userId        String
-  expenseDate   DateTime
-  amount        Decimal   @db.Decimal(12, 2)
-  category      String
-  description   String?
+  id          String   @id @default(uuid())
+  branchId    String
+  userId      String
+  expenseDate DateTime
+  amount      Decimal  @db.Decimal(12, 2)
+  category    String
+  description String?
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -579,8 +581,8 @@ model Expense {
   version   Int       @default(1)
   deviceId  String?
 
-  branch        Branch    @relation(fields: [branchId], references: [id])
-  user          User      @relation(fields: [userId], references: [id])
+  branch Branch @relation(fields: [branchId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
 }
 
 // ==========================================
@@ -588,15 +590,15 @@ model Expense {
 // ==========================================
 
 model StockTransaction {
-  id              String    @id @default(uuid())
+  id              String @id @default(uuid())
   productId       String
   warehouseId     String
   transactionType String
   referenceId     String
-  
-  unitId          String
-  unitQuantity    Decimal   @db.Decimal(12, 4)
-  baseQuantity    Decimal   @db.Decimal(12, 4)
+
+  unitId       String
+  unitQuantity Decimal @db.Decimal(12, 4)
+  baseQuantity Decimal @db.Decimal(12, 4)
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -604,18 +606,18 @@ model StockTransaction {
   version   Int       @default(1)
   deviceId  String?
 
-  product         Product   @relation(fields: [productId], references: [id])
-  warehouse       Warehouse @relation(fields: [warehouseId], references: [id])
-  unit            Unit      @relation(fields: [unitId], references: [id])
-  
+  product   Product   @relation(fields: [productId], references: [id])
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id])
+  unit      Unit      @relation(fields: [unitId], references: [id])
+
   @@index([productId, warehouseId])
 }
 
 model StockBalance {
-  id            String    @id @default(uuid())
-  productId     String
-  warehouseId   String
-  quantity      Decimal   @db.Decimal(12, 4)
+  id          String  @id @default(uuid())
+  productId   String
+  warehouseId String
+  quantity    Decimal @db.Decimal(12, 4)
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -623,9 +625,9 @@ model StockBalance {
   version   Int       @default(1)
   deviceId  String?
 
-  product       Product   @relation(fields: [productId], references: [id])
-  warehouse     Warehouse @relation(fields: [warehouseId], references: [id])
-  
+  product   Product   @relation(fields: [productId], references: [id])
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id])
+
   @@unique([productId, warehouseId])
 }
 
@@ -634,9 +636,9 @@ model StockBalance {
 // ==========================================
 
 model InvoiceTemplate {
-  id            String    @id @default(uuid())
-  name          String
-  contentHtml   String    @db.Text
+  id          String @id @default(uuid())
+  name        String
+  contentHtml String @db.Text
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -644,14 +646,14 @@ model InvoiceTemplate {
   version   Int       @default(1)
   deviceId  String?
 
-  settings      InvoiceTemplateSetting[]
+  settings InvoiceTemplateSetting[]
 }
 
 model InvoiceTemplateSetting {
-  id            String    @id @default(uuid())
-  templateId    String
-  key           String
-  value         String
+  id         String @id @default(uuid())
+  templateId String
+  key        String
+  value      String
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -659,7 +661,7 @@ model InvoiceTemplateSetting {
   version   Int       @default(1)
   deviceId  String?
 
-  template      InvoiceTemplate @relation(fields: [templateId], references: [id])
+  template InvoiceTemplate @relation(fields: [templateId], references: [id])
 }
 
 // ==========================================
@@ -667,40 +669,40 @@ model InvoiceTemplateSetting {
 // ==========================================
 
 model SyncQueue {
-  id          String    @id @default(uuid())
+  id          String  @id @default(uuid())
   entityType  String
   entityId    String
   action      String
   payload     Json?
-  status      String    @default("PENDING")
+  status      String  @default("PENDING")
   errorReason String?
   deviceId    String
 
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([status, createdAt])
 }
 
 model SyncCursor {
-  deviceId    String
-  entityType  String
+  deviceId     String
+  entityType   String
   lastSyncedAt DateTime
 
   @@id([deviceId, entityType])
 }
 
 model AuditLog {
-  id          String    @id @default(uuid())
-  userId      String?
-  action      String
-  entityType  String
-  entityId    String
-  details     Json?
-  createdAt   DateTime  @default(now())
+  id         String   @id @default(uuid())
+  userId     String?
+  action     String
+  entityType String
+  entityId   String
+  details    Json?
+  createdAt  DateTime @default(now())
 
-  user        User?     @relation(fields: [userId], references: [id])
-  
+  user User? @relation(fields: [userId], references: [id])
+
   @@index([entityType, entityId])
 }
 
@@ -713,5 +715,5 @@ model RefreshToken {
   createdAt DateTime @default(now())
   revoked   Boolean  @default(false)
 
-  user      User     @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id])
 }

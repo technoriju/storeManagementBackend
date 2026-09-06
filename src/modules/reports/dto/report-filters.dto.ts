@@ -1,5 +1,5 @@
-import { IsOptional, IsString, IsInt, Min } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsOptional, IsString, IsInt, Min } from "class-validator";
+import { Type } from "class-transformer";
 
 export class ReportFiltersDto {
   @IsOptional()
@@ -20,7 +20,7 @@ export class ReportFiltersDto {
 
   @IsOptional()
   @IsString()
-  sortOrder?: 'asc' | 'desc' = 'desc';
+  sortOrder?: "asc" | "desc" = "desc";
 
   @IsOptional()
   @IsString()
@@ -102,5 +102,5 @@ export class ReportFiltersDto {
 
   @IsOptional()
   @IsString()
-  exportFormat?: 'excel' | 'csv' | 'pdf'; // if this is present, we return file instead of json
+  exportFormat?: "excel" | "csv" | "pdf"; // if this is present, we return file instead of json
 }

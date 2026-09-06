@@ -1,4 +1,8 @@
 import { Module } from "@nestjs/common";
+import { IntegrityService } from "./integrity.service";
 
-@Module({})
+@Module({
+  providers: [IntegrityService],
+  exports: [IntegrityService],
+})
 export class AuditModule {}

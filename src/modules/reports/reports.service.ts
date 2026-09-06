@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../../infrastructure/data-access/prisma/prisma.service';
-import { ReportFiltersDto } from './dto/report-filters.dto';
+import { Injectable, Logger } from "@nestjs/common";
+import { PrismaService } from "../../infrastructure/data-access/prisma/prisma.service";
+import { ReportFiltersDto } from "./dto/report-filters.dto";
 
 @Injectable()
 export class ReportsService {
@@ -41,7 +41,10 @@ export class ReportsService {
 
   private toNumber(val: any, decimals = 2): number {
     if (val === null || val === undefined) return 0;
-    const num = typeof val === 'object' && 'toNumber' in val ? val.toNumber() : Number(val);
+    const num =
+      typeof val === "object" && "toNumber" in val
+        ? val.toNumber()
+        : Number(val);
     return isNaN(num) ? 0 : Number(num.toFixed(decimals));
   }
 
@@ -49,7 +52,10 @@ export class ReportsService {
   // 1. SALES REPORT
   // ==========================================
   async getSalesReport(filters: ReportFiltersDto) {
-    const { page, limit, skip } = this.getPagination(filters.page, filters.limit);
+    const { page, limit, skip } = this.getPagination(
+      filters.page,
+      filters.limit,
+    );
     const dateRange = this.parseDateRange(filters.startDate, filters.endDate);
 
     const where: any = {
@@ -84,14 +90,23 @@ export class ReportsService {
         where,
         skip,
         take: limit,
-        orderBy: { saleDate: filters.sortOrder === 'asc' ? 'asc' : 'desc' },
+        orderBy: { saleDate: filters.sortOrder === "asc" ? "asc" : "desc" },
         include: {
-          customer: { select: { id: true, name: true, phone: true, email: true } },
+          customer: {
+            select: { id: true, name: true, phone: true, email: true },
+          },
           branch: { select: { id: true, name: true } },
           warehouse: { select: { id: true, name: true } },
           payments: {
             include: {
-              payment: { select: { id: true, amount: true, paymentMethod: true, paymentDate: true } },
+              payment: {
+                select: {
+                  id: true,
+                  amount: true,
+                  paymentMethod: true,
+                  paymentDate: true,
+                },
+              },
             },
           },
           _count: { select: { items: true } },
@@ -109,10 +124,10 @@ export class ReportsService {
         id: sale.id,
         invoiceNumber: sale.invoiceNumber,
         saleDate: sale.saleDate,
-        customerName: sale.customer?.name || 'Walk-in Customer',
-        customerPhone: sale.customer?.phone || '',
-        branchName: sale.branch?.name || '',
-        warehouseName: sale.warehouse?.name || '',
+        customerName: sale.customer?.name || "Walk-in Customer",
+        customerPhone: sale.customer?.phone || "",
+        branchName: sale.branch?.name || "",
+        warehouseName: sale.warehouse?.name || "",
         itemCount: sale._count.items,
         status: sale.status,
         subTotal: this.toNumber(sale.subTotal),
@@ -146,7 +161,10 @@ export class ReportsService {
   // 2. PURCHASE REPORT
   // ==========================================
   async getPurchaseReport(filters: ReportFiltersDto) {
-    const { page, limit, skip } = this.getPagination(filters.page, filters.limit);
+    const { page, limit, skip } = this.getPagination(
+      filters.page,
+      filters.limit,
+    );
     const dateRange = this.parseDateRange(filters.startDate, filters.endDate);
 
     const where: any = {
@@ -180,14 +198,21 @@ export class ReportsService {
         where,
         skip,
         take: limit,
-        orderBy: { purchaseDate: filters.sortOrder === 'asc' ? 'asc' : 'desc' },
+        orderBy: { purchaseDate: filters.sortOrder === "asc" ? "asc" : "desc" },
         include: {
           supplier: { select: { id: true, name: true, phone: true } },
           branch: { select: { id: true, name: true } },
           warehouse: { select: { id: true, name: true } },
           payments: {
             include: {
-              payment: { select: { id: true, amount: true, paymentMethod: true, paymentDate: true } },
+              payment: {
+                select: {
+                  id: true,
+                  amount: true,
+                  paymentMethod: true,
+                  paymentDate: true,
+                },
+              },
             },
           },
           _count: { select: { items: true } },
@@ -205,10 +230,10 @@ export class ReportsService {
         id: purchase.id,
         invoiceNumber: purchase.invoiceNumber,
         purchaseDate: purchase.purchaseDate,
-        supplierName: purchase.supplier?.name || '',
-        supplierPhone: purchase.supplier?.phone || '',
-        branchName: purchase.branch?.name || '',
-        warehouseName: purchase.warehouse?.name || '',
+        supplierName: purchase.supplier?.name || "",
+        supplierPhone: purchase.supplier?.phone || "",
+        branchName: purchase.branch?.name || "",
+        warehouseName: purchase.warehouse?.name || "",
         itemCount: purchase._count.items,
         status: purchase.status,
         subTotal: this.toNumber(purchase.subTotal),
@@ -242,7 +267,10 @@ export class ReportsService {
   // 3. PROFIT REPORT
   // ==========================================
   async getProfitReport(filters: ReportFiltersDto) {
-    const { page, limit, skip } = this.getPagination(filters.page, filters.limit);
+    const { page, limit, skip } = this.getPagination(
+      filters.page,
+      filters.limit,
+    );
     const dateRange = this.parseDateRange(filters.startDate, filters.endDate);
 
     const salesWhere: any = {
@@ -282,7 +310,7 @@ export class ReportsService {
       where: salesWhere,
       skip,
       take: limit,
-      orderBy: { saleDate: 'desc' },
+      orderBy: { saleDate: "desc" },
       include: {
         customer: { select: { name: true } },
         items: {
@@ -304,20 +332,24 @@ export class ReportsService {
 
       sale.items.forEach((item) => {
         const qty = this.toNumber(item.quantity, 4);
-        const purchasePrice =
-          item.product?.prices?.find((p) => p.priceType === 'PURCHASE')?.price;
-        const unitCost = purchasePrice ? this.toNumber(purchasePrice) : this.toNumber(item.unitPrice) * 0.7;
+        const purchasePrice = item.product?.prices?.find(
+          (p) => p.priceType === "PURCHASE",
+        )?.price;
+        const unitCost = purchasePrice
+          ? this.toNumber(purchasePrice)
+          : this.toNumber(item.unitPrice) * 0.7;
         estimatedCost += qty * unitCost;
       });
 
       const grossProfit = Number((revenue - estimatedCost).toFixed(2));
-      const margin = revenue > 0 ? Number(((grossProfit / revenue) * 100).toFixed(2)) : 0;
+      const margin =
+        revenue > 0 ? Number(((grossProfit / revenue) * 100).toFixed(2)) : 0;
 
       return {
         id: sale.id,
         invoiceNumber: sale.invoiceNumber,
         saleDate: sale.saleDate,
-        customerName: sale.customer?.name || 'Walk-in',
+        customerName: sale.customer?.name || "Walk-in",
         revenue,
         estimatedCost: Number(estimatedCost.toFixed(2)),
         grossProfit,
@@ -328,7 +360,10 @@ export class ReportsService {
     const totalRevenue = this.toNumber(salesAgg._sum.grandTotal);
     // Approximate overall COGS from paginated sample ratio or items
     const sampleRevenue = formattedData.reduce((acc, s) => acc + s.revenue, 0);
-    const sampleCost = formattedData.reduce((acc, s) => acc + s.estimatedCost, 0);
+    const sampleCost = formattedData.reduce(
+      (acc, s) => acc + s.estimatedCost,
+      0,
+    );
     const costRatio = sampleRevenue > 0 ? sampleCost / sampleRevenue : 0.7;
     const totalCOGS = Number((totalRevenue * costRatio).toFixed(2));
     const grossProfit = Number((totalRevenue - totalCOGS).toFixed(2));
@@ -340,10 +375,16 @@ export class ReportsService {
         totalRevenue,
         costOfGoodsSold: totalCOGS,
         grossProfit,
-        grossProfitMargin: totalRevenue > 0 ? Number(((grossProfit / totalRevenue) * 100).toFixed(2)) : 0,
+        grossProfitMargin:
+          totalRevenue > 0
+            ? Number(((grossProfit / totalRevenue) * 100).toFixed(2))
+            : 0,
         totalExpenses,
         netProfit,
-        netProfitMargin: totalRevenue > 0 ? Number(((netProfit / totalRevenue) * 100).toFixed(2)) : 0,
+        netProfitMargin:
+          totalRevenue > 0
+            ? Number(((netProfit / totalRevenue) * 100).toFixed(2))
+            : 0,
       },
       pagination: {
         page,
@@ -359,7 +400,10 @@ export class ReportsService {
   // 4. STOCK REPORT
   // ==========================================
   async getStockReport(filters: ReportFiltersDto) {
-    const { page, limit, skip } = this.getPagination(filters.page, filters.limit);
+    const { page, limit, skip } = this.getPagination(
+      filters.page,
+      filters.limit,
+    );
 
     const where: any = {
       ...(filters.warehouseId && { warehouseId: filters.warehouseId }),
@@ -390,7 +434,7 @@ export class ReportsService {
         where,
         skip,
         take: limit,
-        orderBy: { quantity: filters.sortOrder === 'asc' ? 'asc' : 'desc' },
+        orderBy: { quantity: filters.sortOrder === "asc" ? "asc" : "desc" },
         include: {
           warehouse: { select: { id: true, name: true } },
           product: {
@@ -408,8 +452,9 @@ export class ReportsService {
     let estimatedStockValue = 0;
     const formattedData = balances.map((b) => {
       const quantity = this.toNumber(b.quantity, 4);
-      const purchasePrice =
-        b.product?.prices?.find((p) => p.priceType === 'PURCHASE')?.price;
+      const purchasePrice = b.product?.prices?.find(
+        (p) => p.priceType === "PURCHASE",
+      )?.price;
       const unitCost = purchasePrice ? this.toNumber(purchasePrice) : 0;
       const stockValue = Number((quantity * unitCost).toFixed(2));
       estimatedStockValue += stockValue;
@@ -420,14 +465,16 @@ export class ReportsService {
         productCode: b.product.productCode,
         productName: b.product.name,
         sku: b.product.sku,
-        category: b.product.category?.name || '',
-        brand: b.product.brand?.name || '',
+        category: b.product.category?.name || "",
+        brand: b.product.brand?.name || "",
         warehouseName: b.warehouse.name,
         quantity,
         unit: b.product.baseUnit.shortName || b.product.baseUnit.name,
         unitCost,
         stockValue,
-        lowStockLevel: b.product.lowStockLevel ? this.toNumber(b.product.lowStockLevel, 4) : null,
+        lowStockLevel: b.product.lowStockLevel
+          ? this.toNumber(b.product.lowStockLevel, 4)
+          : null,
       };
     });
 
@@ -451,13 +498,18 @@ export class ReportsService {
   // 5. STOCK LEDGER
   // ==========================================
   async getStockLedger(filters: ReportFiltersDto) {
-    const { page, limit, skip } = this.getPagination(filters.page, filters.limit);
+    const { page, limit, skip } = this.getPagination(
+      filters.page,
+      filters.limit,
+    );
     const dateRange = this.parseDateRange(filters.startDate, filters.endDate);
 
     const where: any = {
       ...(filters.productId && { productId: filters.productId }),
       ...(filters.warehouseId && { warehouseId: filters.warehouseId }),
-      ...(filters.transactionType && { transactionType: filters.transactionType }),
+      ...(filters.transactionType && {
+        transactionType: filters.transactionType,
+      }),
       ...(dateRange && { createdAt: dateRange }),
       ...(filters.search && {
         product: {
@@ -475,9 +527,11 @@ export class ReportsService {
         where,
         skip,
         take: limit,
-        orderBy: { createdAt: filters.sortOrder === 'asc' ? 'asc' : 'desc' },
+        orderBy: { createdAt: filters.sortOrder === "asc" ? "asc" : "desc" },
         include: {
-          product: { select: { id: true, name: true, sku: true, productCode: true } },
+          product: {
+            select: { id: true, name: true, sku: true, productCode: true },
+          },
           warehouse: { select: { id: true, name: true } },
           unit: { select: { id: true, name: true, shortName: true } },
         },
@@ -490,9 +544,13 @@ export class ReportsService {
     const formattedData = transactions.map((tx) => {
       const qty = this.toNumber(tx.baseQuantity, 4);
       const isNegative =
-        ['SALE', 'OUT', 'TRANSFER_OUT', 'RETURN_OUT', 'ADJUSTMENT_SUB'].includes(
-          tx.transactionType.toUpperCase(),
-        ) || qty < 0;
+        [
+          "SALE",
+          "OUT",
+          "TRANSFER_OUT",
+          "RETURN_OUT",
+          "ADJUSTMENT_SUB",
+        ].includes(tx.transactionType.toUpperCase()) || qty < 0;
 
       if (isNegative) {
         totalOut += Math.abs(qty);
@@ -511,7 +569,7 @@ export class ReportsService {
         referenceId: tx.referenceId,
         quantity: qty,
         unit: tx.unit.shortName || tx.unit.name,
-        direction: isNegative ? 'OUT' : 'IN',
+        direction: isNegative ? "OUT" : "IN",
       };
     });
 
@@ -536,7 +594,10 @@ export class ReportsService {
   // 6. CUSTOMER OUTSTANDING
   // ==========================================
   async getCustomerOutstanding(filters: ReportFiltersDto) {
-    const { page, limit, skip } = this.getPagination(filters.page, filters.limit);
+    const { page, limit, skip } = this.getPagination(
+      filters.page,
+      filters.limit,
+    );
 
     const where: any = {
       deletedAt: null,
@@ -591,7 +652,9 @@ export class ReportsService {
         });
       });
 
-      const outstanding = Number((totalBilled - totalPaid - totalReturned).toFixed(2));
+      const outstanding = Number(
+        (totalBilled - totalPaid - totalReturned).toFixed(2),
+      );
       if (outstanding > 0) customersWithDue++;
 
       overallBilled += totalBilled;
@@ -601,9 +664,11 @@ export class ReportsService {
       return {
         customerId: customer.id,
         name: customer.name,
-        phone: customer.phone || '',
-        gstin: customer.gstin || '',
-        creditLimit: customer.creditLimit ? this.toNumber(customer.creditLimit) : null,
+        phone: customer.phone || "",
+        gstin: customer.gstin || "",
+        creditLimit: customer.creditLimit
+          ? this.toNumber(customer.creditLimit)
+          : null,
         totalSalesCount: customer.sales.length,
         totalBilled: Number(totalBilled.toFixed(2)),
         totalPaid: Number(totalPaid.toFixed(2)),
@@ -643,7 +708,10 @@ export class ReportsService {
   // 7. SUPPLIER OUTSTANDING
   // ==========================================
   async getSupplierOutstanding(filters: ReportFiltersDto) {
-    const { page, limit, skip } = this.getPagination(filters.page, filters.limit);
+    const { page, limit, skip } = this.getPagination(
+      filters.page,
+      filters.limit,
+    );
 
     const where: any = {
       deletedAt: null,
@@ -698,7 +766,9 @@ export class ReportsService {
         });
       });
 
-      const outstanding = Number((totalPurchased - totalPaid - totalReturned).toFixed(2));
+      const outstanding = Number(
+        (totalPurchased - totalPaid - totalReturned).toFixed(2),
+      );
       if (outstanding > 0) suppliersWithDue++;
 
       overallPurchased += totalPurchased;
@@ -708,8 +778,8 @@ export class ReportsService {
       return {
         supplierId: supplier.id,
         name: supplier.name,
-        phone: supplier.phone || '',
-        gstin: supplier.gstin || '',
+        phone: supplier.phone || "",
+        gstin: supplier.gstin || "",
         totalPurchasesCount: supplier.purchases.length,
         totalPurchased: Number(totalPurchased.toFixed(2)),
         totalPaid: Number(totalPaid.toFixed(2)),
@@ -745,7 +815,10 @@ export class ReportsService {
   // 8. PAYMENT REPORT
   // ==========================================
   async getPaymentReport(filters: ReportFiltersDto) {
-    const { page, limit, skip } = this.getPagination(filters.page, filters.limit);
+    const { page, limit, skip } = this.getPagination(
+      filters.page,
+      filters.limit,
+    );
     const dateRange = this.parseDateRange(filters.startDate, filters.endDate);
 
     const where: any = {
@@ -761,65 +834,70 @@ export class ReportsService {
     };
 
     // Method breakdown aggregation
-    const [aggregate, methodGroups, totalRecords, payments] = await Promise.all([
-      this.prisma.payment.aggregate({
-        where,
-        _count: { id: true },
-        _sum: { amount: true },
-      }),
-      this.prisma.payment.groupBy({
-        by: ['paymentMethod'],
-        where,
-        _sum: { amount: true },
-        _count: { id: true },
-      }),
-      this.prisma.payment.count({ where }),
-      this.prisma.payment.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { paymentDate: filters.sortOrder === 'asc' ? 'asc' : 'desc' },
-        include: {
-          salePayments: {
-            include: {
-              sale: {
-                select: {
-                  invoiceNumber: true,
-                  customer: { select: { name: true } },
+    const [aggregate, methodGroups, totalRecords, payments] = await Promise.all(
+      [
+        this.prisma.payment.aggregate({
+          where,
+          _count: { id: true },
+          _sum: { amount: true },
+        }),
+        this.prisma.payment.groupBy({
+          by: ["paymentMethod"],
+          where,
+          _sum: { amount: true },
+          _count: { id: true },
+        }),
+        this.prisma.payment.count({ where }),
+        this.prisma.payment.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy: {
+            paymentDate: filters.sortOrder === "asc" ? "asc" : "desc",
+          },
+          include: {
+            salePayments: {
+              include: {
+                sale: {
+                  select: {
+                    invoiceNumber: true,
+                    customer: { select: { name: true } },
+                  },
+                },
+              },
+            },
+            purchasePayments: {
+              include: {
+                purchase: {
+                  select: {
+                    invoiceNumber: true,
+                    supplier: { select: { name: true } },
+                  },
                 },
               },
             },
           },
-          purchasePayments: {
-            include: {
-              purchase: {
-                select: {
-                  invoiceNumber: true,
-                  supplier: { select: { name: true } },
-                },
-              },
-            },
-          },
-        },
-      }),
-    ]);
+        }),
+      ],
+    );
 
     const formattedData = payments.map((p) => {
       const isSale = p.salePayments.length > 0;
       const isPurchase = p.purchasePayments.length > 0;
 
-      let type = 'OTHER';
-      let partyName = '';
-      let invoiceNumber = '';
+      let type = "OTHER";
+      let partyName = "";
+      let invoiceNumber = "";
 
       if (isSale) {
-        type = 'RECEIVED';
-        partyName = p.salePayments[0]?.sale?.customer?.name || 'Customer';
-        invoiceNumber = p.salePayments[0]?.sale?.invoiceNumber || '';
+        type = "RECEIVED";
+        partyName = p.salePayments[0]?.sale?.customer?.name || "Customer";
+        invoiceNumber = p.salePayments[0]?.sale?.invoiceNumber || "";
       } else if (isPurchase) {
-        type = 'PAID';
-        partyName = p.purchasePayments[0]?.purchase?.supplier?.name || 'Supplier';
-        invoiceNumber = p.purchasePayments[0]?.purchase?.invoiceNumber || '';
+        type = "PAID";
+        partyName =
+          p.purchasePayments[0]?.purchase?.supplier?.name || "Supplier";
+        invoiceNumber = p.purchasePayments[0]?.purchase?.invoiceNumber || "";
       }
 
       return {
@@ -827,7 +905,7 @@ export class ReportsService {
         paymentDate: p.paymentDate,
         amount: this.toNumber(p.amount),
         paymentMethod: p.paymentMethod,
-        referenceNumber: p.referenceNumber || '',
+        referenceNumber: p.referenceNumber || "",
         type,
         partyName,
         invoiceNumber,
@@ -859,7 +937,10 @@ export class ReportsService {
   // 9. EXPENSE REPORT
   // ==========================================
   async getExpenseReport(filters: ReportFiltersDto) {
-    const { page, limit, skip } = this.getPagination(filters.page, filters.limit);
+    const { page, limit, skip } = this.getPagination(
+      filters.page,
+      filters.limit,
+    );
     const dateRange = this.parseDateRange(filters.startDate, filters.endDate);
 
     const where: any = {
@@ -876,40 +957,43 @@ export class ReportsService {
       }),
     };
 
-    const [aggregate, categoryGroups, totalRecords, expenses] = await Promise.all([
-      this.prisma.expense.aggregate({
-        where,
-        _count: { id: true },
-        _sum: { amount: true },
-        _avg: { amount: true },
-      }),
-      this.prisma.expense.groupBy({
-        by: ['category'],
-        where,
-        _sum: { amount: true },
-        _count: { id: true },
-      }),
-      this.prisma.expense.count({ where }),
-      this.prisma.expense.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { expenseDate: filters.sortOrder === 'asc' ? 'asc' : 'desc' },
-        include: {
-          branch: { select: { id: true, name: true } },
-          user: { select: { id: true, fullName: true, username: true } },
-        },
-      }),
-    ]);
+    const [aggregate, categoryGroups, totalRecords, expenses] =
+      await Promise.all([
+        this.prisma.expense.aggregate({
+          where,
+          _count: { id: true },
+          _sum: { amount: true },
+          _avg: { amount: true },
+        }),
+        this.prisma.expense.groupBy({
+          by: ["category"],
+          where,
+          _sum: { amount: true },
+          _count: { id: true },
+        }),
+        this.prisma.expense.count({ where }),
+        this.prisma.expense.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy: {
+            expenseDate: filters.sortOrder === "asc" ? "asc" : "desc",
+          },
+          include: {
+            branch: { select: { id: true, name: true } },
+            user: { select: { id: true, fullName: true, username: true } },
+          },
+        }),
+      ]);
 
     const formattedData = expenses.map((exp) => ({
       id: exp.id,
       expenseDate: exp.expenseDate,
       category: exp.category,
       amount: this.toNumber(exp.amount),
-      description: exp.description || '',
-      branchName: exp.branch?.name || '',
-      userName: exp.user?.fullName || exp.user?.username || '',
+      description: exp.description || "",
+      branchName: exp.branch?.name || "",
+      userName: exp.user?.fullName || exp.user?.username || "",
     }));
 
     const byCategory: Record<string, { total: number; count: number }> = {};
@@ -941,7 +1025,10 @@ export class ReportsService {
   // 10. GST SUMMARY
   // ==========================================
   async getGstSummary(filters: ReportFiltersDto) {
-    const { page, limit, skip } = this.getPagination(filters.page, filters.limit);
+    const { page, limit, skip } = this.getPagination(
+      filters.page,
+      filters.limit,
+    );
     const dateRange = this.parseDateRange(filters.startDate, filters.endDate);
 
     const salesWhere: any = {
@@ -956,28 +1043,29 @@ export class ReportsService {
       ...(filters.branchId && { branchId: filters.branchId }),
     };
 
-    const [salesAgg, purchasesAgg, totalSalesRecords, sales] = await Promise.all([
-      this.prisma.sale.aggregate({
-        where: salesWhere,
-        _count: { id: true },
-        _sum: { subTotal: true, taxTotal: true, grandTotal: true },
-      }),
-      this.prisma.purchase.aggregate({
-        where: purchaseWhere,
-        _count: { id: true },
-        _sum: { subTotal: true, taxTotal: true, grandTotal: true },
-      }),
-      this.prisma.sale.count({ where: salesWhere }),
-      this.prisma.sale.findMany({
-        where: salesWhere,
-        skip,
-        take: limit,
-        orderBy: { saleDate: 'desc' },
-        include: {
-          customer: { select: { name: true, gstin: true } },
-        },
-      }),
-    ]);
+    const [salesAgg, purchasesAgg, totalSalesRecords, sales] =
+      await Promise.all([
+        this.prisma.sale.aggregate({
+          where: salesWhere,
+          _count: { id: true },
+          _sum: { subTotal: true, taxTotal: true, grandTotal: true },
+        }),
+        this.prisma.purchase.aggregate({
+          where: purchaseWhere,
+          _count: { id: true },
+          _sum: { subTotal: true, taxTotal: true, grandTotal: true },
+        }),
+        this.prisma.sale.count({ where: salesWhere }),
+        this.prisma.sale.findMany({
+          where: salesWhere,
+          skip,
+          take: limit,
+          orderBy: { saleDate: "desc" },
+          include: {
+            customer: { select: { name: true, gstin: true } },
+          },
+        }),
+      ]);
 
     const outputTax = this.toNumber(salesAgg._sum.taxTotal);
     const inputTax = this.toNumber(purchasesAgg._sum.taxTotal);
@@ -990,8 +1078,8 @@ export class ReportsService {
         id: s.id,
         invoiceNumber: s.invoiceNumber,
         date: s.saleDate,
-        partyName: s.customer?.name || 'Walk-in',
-        gstin: s.customer?.gstin || 'Unregistered',
+        partyName: s.customer?.name || "Walk-in",
+        gstin: s.customer?.gstin || "Unregistered",
         taxableValue: this.toNumber(s.subTotal),
         cgst: Number((tax / 2).toFixed(2)),
         sgst: Number((tax / 2).toFixed(2)),
@@ -1033,7 +1121,10 @@ export class ReportsService {
   // 11. DAILY SALES
   // ==========================================
   async getDailySalesReport(filters: ReportFiltersDto) {
-    const { page, limit, skip } = this.getPagination(filters.page, filters.limit);
+    const { page, limit, skip } = this.getPagination(
+      filters.page,
+      filters.limit,
+    );
     const dateRange = this.parseDateRange(filters.startDate, filters.endDate);
 
     const where: any = {
@@ -1052,7 +1143,7 @@ export class ReportsService {
         discountTotal: true,
         grandTotal: true,
       },
-      orderBy: { saleDate: 'desc' },
+      orderBy: { saleDate: "desc" },
     });
 
     const dayMap = new Map<
@@ -1068,7 +1159,7 @@ export class ReportsService {
     >();
 
     sales.forEach((s) => {
-      const dateKey = s.saleDate.toISOString().split('T')[0];
+      const dateKey = s.saleDate.toISOString().split("T")[0];
       const existing = dayMap.get(dateKey) || {
         date: dateKey,
         invoicesCount: 0,
@@ -1098,10 +1189,16 @@ export class ReportsService {
     // Summary calculations
     const totalDays = dailyList.length;
     const totalRevenue = dailyList.reduce((acc, d) => acc + d.grandTotal, 0);
-    const totalInvoices = dailyList.reduce((acc, d) => acc + d.invoicesCount, 0);
+    const totalInvoices = dailyList.reduce(
+      (acc, d) => acc + d.invoicesCount,
+      0,
+    );
     const avgDailySales = totalDays > 0 ? totalRevenue / totalDays : 0;
     const highestSalesDay = dailyList.length
-      ? dailyList.reduce((max, d) => (d.grandTotal > max.grandTotal ? d : max), dailyList[0])
+      ? dailyList.reduce(
+          (max, d) => (d.grandTotal > max.grandTotal ? d : max),
+          dailyList[0],
+        )
       : null;
 
     const totalRecords = dailyList.length;
@@ -1129,7 +1226,10 @@ export class ReportsService {
   // 12. MONTHLY SALES
   // ==========================================
   async getMonthlySalesReport(filters: ReportFiltersDto) {
-    const { page, limit, skip } = this.getPagination(filters.page, filters.limit);
+    const { page, limit, skip } = this.getPagination(
+      filters.page,
+      filters.limit,
+    );
     const dateRange = this.parseDateRange(filters.startDate, filters.endDate);
 
     const where: any = {
@@ -1148,7 +1248,7 @@ export class ReportsService {
         discountTotal: true,
         grandTotal: true,
       },
-      orderBy: { saleDate: 'desc' },
+      orderBy: { saleDate: "desc" },
     });
 
     const monthMap = new Map<
@@ -1193,10 +1293,16 @@ export class ReportsService {
 
     const totalMonths = monthlyList.length;
     const totalRevenue = monthlyList.reduce((acc, m) => acc + m.grandTotal, 0);
-    const totalInvoices = monthlyList.reduce((acc, m) => acc + m.invoicesCount, 0);
+    const totalInvoices = monthlyList.reduce(
+      (acc, m) => acc + m.invoicesCount,
+      0,
+    );
     const avgMonthlySales = totalMonths > 0 ? totalRevenue / totalMonths : 0;
     const bestMonth = monthlyList.length
-      ? monthlyList.reduce((max, m) => (m.grandTotal > max.grandTotal ? m : max), monthlyList[0])
+      ? monthlyList.reduce(
+          (max, m) => (m.grandTotal > max.grandTotal ? m : max),
+          monthlyList[0],
+        )
       : null;
 
     const totalRecords = monthlyList.length;
@@ -1224,7 +1330,10 @@ export class ReportsService {
   // 13. TOP PRODUCTS
   // ==========================================
   async getTopProductsReport(filters: ReportFiltersDto) {
-    const { page, limit, skip } = this.getPagination(filters.page, filters.limit);
+    const { page, limit, skip } = this.getPagination(
+      filters.page,
+      filters.limit,
+    );
     const dateRange = this.parseDateRange(filters.startDate, filters.endDate);
 
     const saleWhere: any = {
@@ -1236,7 +1345,7 @@ export class ReportsService {
 
     // Group sale items by product ID with aggregate sums
     const grouped = await this.prisma.saleItem.groupBy({
-      by: ['productId'],
+      by: ["productId"],
       where: {
         sale: saleWhere,
         product: {
@@ -1254,7 +1363,7 @@ export class ReportsService {
       },
       orderBy: {
         _sum: {
-          total: 'desc',
+          total: "desc",
         },
       },
     });
@@ -1279,12 +1388,12 @@ export class ReportsService {
       return {
         rank: skip + idx + 1,
         productId: g.productId,
-        productCode: product?.productCode || '',
-        name: product?.name || 'Unknown Product',
-        sku: product?.sku || '',
-        category: product?.category?.name || '',
-        brand: product?.brand?.name || '',
-        unit: product?.baseUnit?.shortName || product?.baseUnit?.name || '',
+        productCode: product?.productCode || "",
+        name: product?.name || "Unknown Product",
+        sku: product?.sku || "",
+        category: product?.category?.name || "",
+        brand: product?.brand?.name || "",
+        unit: product?.baseUnit?.shortName || product?.baseUnit?.name || "",
         totalQuantitySold: this.toNumber(g._sum.quantity, 4),
         totalRevenue: this.toNumber(g._sum.total),
         orderCount: g._count.id,
@@ -1320,7 +1429,10 @@ export class ReportsService {
   // 14. LOW STOCK REPORT
   // ==========================================
   async getLowStockReport(filters: ReportFiltersDto) {
-    const { page, limit, skip } = this.getPagination(filters.page, filters.limit);
+    const { page, limit, skip } = this.getPagination(
+      filters.page,
+      filters.limit,
+    );
 
     const where: any = {
       deletedAt: null,
@@ -1364,8 +1476,12 @@ export class ReportsService {
         0,
       );
 
-      const lowStockLevel = p.lowStockLevel ? this.toNumber(p.lowStockLevel, 4) : 10;
-      const reorderLevel = p.reorderLevel ? this.toNumber(p.reorderLevel, 4) : lowStockLevel;
+      const lowStockLevel = p.lowStockLevel
+        ? this.toNumber(p.lowStockLevel, 4)
+        : 10;
+      const reorderLevel = p.reorderLevel
+        ? this.toNumber(p.reorderLevel, 4)
+        : lowStockLevel;
 
       if (currentStock <= lowStockLevel) {
         const isOutOfStock = currentStock <= 0;
@@ -1380,13 +1496,13 @@ export class ReportsService {
           productCode: p.productCode,
           name: p.name,
           sku: p.sku,
-          category: p.category?.name || '',
-          brand: p.brand?.name || '',
-          unit: p.baseUnit?.shortName || p.baseUnit?.name || '',
+          category: p.category?.name || "",
+          brand: p.brand?.name || "",
+          unit: p.baseUnit?.shortName || p.baseUnit?.name || "",
           currentStock,
           lowStockLevel,
           reorderLevel,
-          status: isOutOfStock ? 'OUT_OF_STOCK' : 'LOW_STOCK',
+          status: isOutOfStock ? "OUT_OF_STOCK" : "LOW_STOCK",
         });
       }
     });

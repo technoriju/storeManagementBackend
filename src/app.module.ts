@@ -27,6 +27,8 @@ import { ReportsModule } from "./modules/reports/reports.module";
 import { BillingModule } from "./modules/billing/billing.module";
 import { SyncModule } from "./modules/sync/sync.module";
 import { AuditModule } from "./modules/audit/audit.module";
+import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
+import { APP_GUARD } from "@nestjs/core";
 
 // We will import feature modules here
 
@@ -62,7 +64,19 @@ import { AuditModule } from "./modules/audit/audit.module";
     BillingModule,
     SyncModule,
     AuditModule,
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000,
+        limit: 100,
+      },
+    ]),
     // Add other feature modules here as they are developed
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
   ],
 })
 export class AppModule {}
