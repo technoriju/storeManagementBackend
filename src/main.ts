@@ -1,4 +1,5 @@
 import { NestFactory } from "@nestjs/core";
+import { SwaggerModule, DocumentBuilder } from "@nestjs/swagger";
 import { AppModule } from "./app.module";
 import { ValidationPipe, VersioningType } from "@nestjs/common";
 import helmet from "helmet";
@@ -46,7 +47,6 @@ async function bootstrap() {
   app.enableCors();
 
   // Swagger setup
-  const { DocumentBuilder, SwaggerModule } = require("@nestjs/swagger");
   const swaggerConfig = new DocumentBuilder()
     .setTitle("Billing Software API")
     .setDescription("The billing software API description")
