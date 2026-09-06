@@ -16,7 +16,7 @@ import { RolesGuard } from "./guards/roles.guard";
 import { PermissionsGuard } from "./guards/permissions.guard";
 import { Roles } from "./decorators/roles.decorator";
 import { Permissions } from "./decorators/permissions.decorator";
-import { LoginDto, RefreshTokenDto } from "./dto/auth.dto";
+import { LoginDto, RefreshTokenDto, RegisterDto } from "./dto/auth.dto";
 
 @ApiTags('Auth')
 @Controller("api/auth")
@@ -57,6 +57,13 @@ export class AuthController {
       await this.authService.logout(body.refreshToken);
     }
     return { success: true };
+  }
+
+  @ApiOperation({ summary: 'Register new tenant/user' })
+  @ApiBody({ type: RegisterDto })
+  @Post("register")
+  async register(@Body() body: RegisterDto) {
+    return this.authService.register(body);
   }
 
   // --- TEST ENDPOINTS --- //

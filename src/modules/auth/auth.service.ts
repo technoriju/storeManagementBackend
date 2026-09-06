@@ -1,8 +1,9 @@
-import { Injectable, UnauthorizedException } from "@nestjs/common";
+import { Injectable, UnauthorizedException, ConflictException, BadRequestException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { PrismaService } from "../../infrastructure/data-access/prisma/prisma.service";
 import * as bcrypt from "bcryptjs";
 import * as crypto from "crypto";
+import { RegisterDto } from "./dto/auth.dto";
 
 @Injectable()
 export class AuthService {
@@ -121,5 +122,80 @@ export class AuthService {
       // Ignored if token not found
     }
     return { success: true };
+  }
+
+  async register(dto: RegisterDto) {
+    const existingUser = await this.prisma.user.findUnique({
+      where: { username: dto.username },
+    });
+    
+    if (existingUser) {
+      throw new ConflictException("Username already exists");
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(dto.password, salt);
+
+    const userId = await this.prisma.$transaction(async (prisma) => {
+      const company = await prisma.company.create({
+        data: {
+          name: dto.companyName,
+          email: dto.email,
+          phone: dto.phone,
+        },
+      });
+
+      const branch = await prisma.branch.create({
+        data: {
+          name: "Main Branch",
+          companyId: company.id,
+        },
+      });
+
+      let adminRole = await prisma.role.findFirst({
+        where: { name: "Admin" },
+      });
+
+      if (!adminRole) {
+        adminRole = await prisma.role.create({
+          data: {
+            name: "Admin",
+            description: "System Administrator",
+          },
+        });
+      }
+
+      const user = await prisma.user.create({
+        data: {
+          username: dto.username,
+          passwordHash,
+          fullName: dto.fullName,
+          email: dto.email,
+          phone: dto.phone,
+          companyId: company.id,
+          branchId: branch.id,
+          roleId: adminRole.id,
+        },
+      });
+
+      return user.id;
+    });
+
+    const userWithRelations = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        role: {
+          include: {
+            permissions: {
+              include: {
+                permission: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return this.login(userWithRelations);
   }
 }
