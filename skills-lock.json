@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "access-control-rbac": {
+      "source": "aj-geddes/useful-ai-prompts",
+      "sourceType": "github",
+      "skillPath": "skills/access-control-rbac/SKILL.md",
+      "computedHash": "da43d66056c50af4c5ea3f24331d5862c9928b5a4dcbbab6d9dc4930b02fc0b3"
+    },
+    "nestjs-best-practices": {
+      "source": "kadajett/agent-nestjs-skills",
+      "sourceType": "github",
+      "skillPath": "skills/nestjs-best-practices/SKILL.md",
+      "computedHash": "29c326e77d1462ed9526996acae5da0cf4003146982abc8c67378f5dbad6b181"
+    }
+  }
+}
