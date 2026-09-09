@@ -16,7 +16,7 @@ export class SyncController {
   @Get("pull")
   async pullChanges(
     @Query("lastSync") lastSync: string,
-    @Query("deviceId") deviceId: string,
+    @Query("deviceId") deviceId?: string,
   ) {
     return this.syncService.pullChanges(lastSync, deviceId);
   }

@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../infrastructure/data-access/prisma/prisma.service';
-import { CreateProductsDto } from './dto/create-product.dto';
-import { UpdateProductsDto } from './dto/update-product.dto';
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "../../infrastructure/data-access/prisma/prisma.service";
+import { CreateProductsDto } from "./dto/create-product.dto";
+import { UpdateProductsDto } from "./dto/update-product.dto";
 
 @Injectable()
 export class ProductsService {
@@ -9,7 +10,7 @@ export class ProductsService {
 
   async create(createProductsDto: CreateProductsDto) {
     return this.prisma.product.create({
-      data: createProductsDto,
+      data: createProductsDto as unknown as Prisma.ProductUncheckedCreateInput,
     });
   }
 
@@ -19,25 +20,25 @@ export class ProductsService {
     });
   }
 
-  async findOne(id: string) {
+  async findOne(id: any) {
     const item = await this.prisma.product.findFirst({
       where: { id, deletedAt: null },
     });
     if (!item) {
-      throw new NotFoundException('Products not found');
+      throw new NotFoundException("Products not found");
     }
     return item;
   }
 
-  async update(id: string, updateProductsDto: UpdateProductsDto) {
+  async update(id: any, updateProductsDto: UpdateProductsDto) {
     await this.findOne(id);
     return this.prisma.product.update({
       where: { id },
-      data: updateProductsDto,
+      data: updateProductsDto as unknown as Prisma.ProductUncheckedUpdateInput,
     });
   }
 
-  async remove(id: string) {
+  async remove(id: any) {
     await this.findOne(id);
     return this.prisma.product.update({
       where: { id },

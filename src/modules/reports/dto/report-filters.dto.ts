@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsInt, Min } from "class-validator";
+import { IsOptional, IsString, IsInt, Min, IsNumber } from "class-validator";
 import { Type } from "class-transformer";
 
 export class ReportFiltersDto {
@@ -35,40 +35,40 @@ export class ReportFiltersDto {
   endDate?: string;
 
   @IsOptional()
-  @IsString()
-  productId?: string;
+  @IsNumber()
+  productId?: number;
 
   @IsOptional()
-  @IsString()
-  categoryId?: string;
+  @IsNumber()
+  categoryId?: number;
 
   @IsOptional()
-  @IsString()
-  brandId?: string;
+  @IsNumber()
+  brandId?: number;
 
   @IsOptional()
-  @IsString()
-  customerId?: string;
+  @IsNumber()
+  customerId?: number;
 
   @IsOptional()
-  @IsString()
-  supplierId?: string;
+  @IsNumber()
+  supplierId?: number;
 
   @IsOptional()
   @IsString()
   paymentMethod?: string;
 
   @IsOptional()
-  @IsString()
-  userId?: string;
+  @IsNumber()
+  userId?: number;
 
   @IsOptional()
-  @IsString()
-  branchId?: string;
+  @IsNumber()
+  branchId?: number;
 
   @IsOptional()
-  @IsString()
-  warehouseId?: string;
+  @IsNumber()
+  warehouseId?: number;
 
   @IsOptional()
   @IsString()

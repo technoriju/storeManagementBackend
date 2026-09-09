@@ -39,7 +39,7 @@ export class SyncService {
           action: change.operation,
           payload: change.payload,
           status: "PENDING",
-          deviceId: change.deviceId || "unknown",
+          deviceId: change.deviceId,
         },
       });
     }
@@ -96,7 +96,7 @@ export class SyncService {
     });
   }
 
-  async pullChanges(lastSyncStr: string, deviceId: string) {
+  async pullChanges(lastSyncStr: string, deviceId?: string) {
     const lastSync = new Date(lastSyncStr || 0);
     const changes = [];
     const newSyncCursor = new Date().toISOString();

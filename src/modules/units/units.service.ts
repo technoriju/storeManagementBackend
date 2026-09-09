@@ -1,7 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../infrastructure/data-access/prisma/prisma.service';
-import { CreateUnitsDto } from './dto/create-unit.dto';
-import { UpdateUnitsDto } from './dto/update-unit.dto';
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { PrismaService } from "../../infrastructure/data-access/prisma/prisma.service";
+import { CreateUnitsDto } from "./dto/create-unit.dto";
+import { UpdateUnitsDto } from "./dto/update-unit.dto";
 
 @Injectable()
 export class UnitsService {
@@ -19,17 +19,17 @@ export class UnitsService {
     });
   }
 
-  async findOne(id: string) {
+  async findOne(id: any) {
     const item = await this.prisma.unit.findFirst({
       where: { id, deletedAt: null },
     });
     if (!item) {
-      throw new NotFoundException('Units not found');
+      throw new NotFoundException("Units not found");
     }
     return item;
   }
 
-  async update(id: string, updateUnitsDto: UpdateUnitsDto) {
+  async update(id: any, updateUnitsDto: UpdateUnitsDto) {
     await this.findOne(id);
     return this.prisma.unit.update({
       where: { id },
@@ -37,7 +37,7 @@ export class UnitsService {
     });
   }
 
-  async remove(id: string) {
+  async remove(id: any) {
     await this.findOne(id);
     return this.prisma.unit.update({
       where: { id },

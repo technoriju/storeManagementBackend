@@ -1,7 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../infrastructure/data-access/prisma/prisma.service';
-import { CreateSubCategoriesDto } from './dto/create-subcategory.dto';
-import { UpdateSubCategoriesDto } from './dto/update-subcategory.dto';
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { PrismaService } from "../../infrastructure/data-access/prisma/prisma.service";
+import { CreateSubCategoriesDto } from "./dto/create-subcategory.dto";
+import { UpdateSubCategoriesDto } from "./dto/update-subcategory.dto";
 
 @Injectable()
 export class SubCategoriesService {
@@ -19,17 +19,17 @@ export class SubCategoriesService {
     });
   }
 
-  async findOne(id: string) {
+  async findOne(id: any) {
     const item = await this.prisma.subCategory.findFirst({
       where: { id, deletedAt: null },
     });
     if (!item) {
-      throw new NotFoundException('SubCategories not found');
+      throw new NotFoundException("SubCategories not found");
     }
     return item;
   }
 
-  async update(id: string, updateSubCategoriesDto: UpdateSubCategoriesDto) {
+  async update(id: any, updateSubCategoriesDto: UpdateSubCategoriesDto) {
     await this.findOne(id);
     return this.prisma.subCategory.update({
       where: { id },
@@ -37,7 +37,7 @@ export class SubCategoriesService {
     });
   }
 
-  async remove(id: string) {
+  async remove(id: any) {
     await this.findOne(id);
     return this.prisma.subCategory.update({
       where: { id },

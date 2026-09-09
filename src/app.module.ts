@@ -29,7 +29,7 @@ import { SyncModule } from "./modules/sync/sync.module";
 import { AuditModule } from "./modules/audit/audit.module";
 import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
 import { APP_GUARD } from "@nestjs/core";
-import { SubCategoriesModule } from './modules/subcategories/subcategories.module';
+import { SubCategoriesModule } from "./modules/subcategories/subcategories.module";
 
 // We will import feature modules here
 

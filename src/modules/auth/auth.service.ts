@@ -1,4 +1,9 @@
-import { Injectable, UnauthorizedException, ConflictException, BadRequestException } from "@nestjs/common";
+import {
+  Injectable,
+  UnauthorizedException,
+  ConflictException,
+  BadRequestException,
+} from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { PrismaService } from "../../infrastructure/data-access/prisma/prisma.service";
 import * as bcrypt from "bcryptjs";
@@ -128,7 +133,7 @@ export class AuthService {
     const existingUser = await this.prisma.user.findUnique({
       where: { username: dto.username },
     });
-    
+
     if (existingUser) {
       throw new ConflictException("Username already exists");
     }

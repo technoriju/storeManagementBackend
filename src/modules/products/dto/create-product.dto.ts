@@ -1,40 +1,46 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsBoolean, IsNumber, IsEnum } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import {
+  IsString,
+  IsOptional,
+  IsBoolean,
+  IsNumber,
+  IsEnum,
+} from "class-validator";
 
 export class CreateProductsDto {
   @ApiPropertyOptional()
-  @IsString()
+  @IsNumber()
   @IsOptional()
-  categoryId?: string;
+  categoryId?: number;
 
   @ApiPropertyOptional()
-  @IsString()
+  @IsNumber()
   @IsOptional()
-  subCategoryId?: string;
+  subCategoryId?: number;
 
   @ApiPropertyOptional()
-  @IsString()
+  @IsNumber()
   @IsOptional()
-  brandId?: string;
+  brandId?: number;
 
   @ApiPropertyOptional()
-  @IsString()
+  @IsNumber()
   @IsOptional()
-  taxRateId?: string;
+  taxRateId?: number;
 
   @ApiProperty()
-  @IsString()
-  baseUnitId: string;
+  @IsNumber()
+  baseUnitId: number;
 
   @ApiPropertyOptional()
-  @IsString()
+  @IsNumber()
   @IsOptional()
-  defaultPurchaseUnitId?: string;
+  defaultPurchaseUnitId?: number;
 
   @ApiPropertyOptional()
-  @IsString()
+  @IsNumber()
   @IsOptional()
-  defaultSalesUnitId?: string;
+  defaultSalesUnitId?: number;
 
   @ApiProperty()
   @IsString()
@@ -64,9 +70,9 @@ export class CreateProductsDto {
   hsnCode?: string;
 
   @ApiPropertyOptional()
-  @IsEnum(['GST', 'NON_GST'])
+  @IsEnum(["GST", "NON_GST"])
   @IsOptional()
-  taxType?: 'GST' | 'NON_GST';
+  taxType?: "GST" | "NON_GST";
 
   @ApiPropertyOptional()
   @IsBoolean()

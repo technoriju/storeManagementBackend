@@ -1,7 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../infrastructure/data-access/prisma/prisma.service';
-import { CreateCategoryDto } from './dto/create-category.dto';
-import { UpdateCategoryDto } from './dto/update-category.dto';
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { PrismaService } from "../../infrastructure/data-access/prisma/prisma.service";
+import { CreateCategoryDto } from "./dto/create-category.dto";
+import { UpdateCategoryDto } from "./dto/update-category.dto";
 
 @Injectable()
 export class CategoriesService {
@@ -19,7 +19,7 @@ export class CategoriesService {
     });
   }
 
-  async findOne(id: string) {
+  async findOne(id: any) {
     const category = await this.prisma.category.findFirst({
       where: { id, deletedAt: null },
       include: {
@@ -34,7 +34,7 @@ export class CategoriesService {
     return category;
   }
 
-  async update(id: string, updateCategoryDto: UpdateCategoryDto) {
+  async update(id: any, updateCategoryDto: UpdateCategoryDto) {
     const category = await this.prisma.category.findFirst({
       where: { id, deletedAt: null },
     });
@@ -52,7 +52,7 @@ export class CategoriesService {
     });
   }
 
-  async remove(id: string) {
+  async remove(id: any) {
     const category = await this.prisma.category.findFirst({
       where: { id, deletedAt: null },
     });

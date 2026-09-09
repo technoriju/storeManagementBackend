@@ -9,7 +9,13 @@ import {
   UseGuards,
   Request,
 } from "@nestjs/common";
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiBody,
+} from "@nestjs/swagger";
 import { AuthService } from "./auth.service";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard";
 import { RolesGuard } from "./guards/roles.guard";
@@ -18,12 +24,12 @@ import { Roles } from "./decorators/roles.decorator";
 import { Permissions } from "./decorators/permissions.decorator";
 import { LoginDto, RefreshTokenDto, RegisterDto } from "./dto/auth.dto";
 
-@ApiTags('Auth')
+@ApiTags("Auth")
 @Controller("auth")
 export class AuthController {
   constructor(private authService: AuthService) {}
 
-  @ApiOperation({ summary: 'Login user' })
+  @ApiOperation({ summary: "Login user" })
   @HttpCode(HttpStatus.OK)
   @Post("login")
   async login(@Body() body: LoginDto) {
@@ -37,7 +43,7 @@ export class AuthController {
     return this.authService.login(user, body.deviceId);
   }
 
-  @ApiOperation({ summary: 'Refresh token' })
+  @ApiOperation({ summary: "Refresh token" })
   @ApiBody({ type: RefreshTokenDto })
   @HttpCode(HttpStatus.OK)
   @Post("refresh")
@@ -48,7 +54,7 @@ export class AuthController {
     return this.authService.refresh(body.refreshToken);
   }
 
-  @ApiOperation({ summary: 'Logout user' })
+  @ApiOperation({ summary: "Logout user" })
   @ApiBody({ type: RefreshTokenDto })
   @HttpCode(HttpStatus.OK)
   @Post("logout")
@@ -59,7 +65,7 @@ export class AuthController {
     return { success: true };
   }
 
-  @ApiOperation({ summary: 'Register new tenant/user' })
+  @ApiOperation({ summary: "Register new tenant/user" })
   @ApiBody({ type: RegisterDto })
   @Post("register")
   async register(@Body() body: RegisterDto) {
@@ -69,7 +75,7 @@ export class AuthController {
   // --- TEST ENDPOINTS --- //
 
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Protected route test' })
+  @ApiOperation({ summary: "Protected route test" })
   @UseGuards(JwtAuthGuard)
   @Get("protected")
   protectedRoute(@Request() req: any) {
@@ -77,7 +83,7 @@ export class AuthController {
   }
 
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Admin route test' })
+  @ApiOperation({ summary: "Admin route test" })
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles("Admin")
   @Get("admin")
@@ -86,7 +92,7 @@ export class AuthController {
   }
 
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Sale permission route test' })
+  @ApiOperation({ summary: "Sale permission route test" })
   @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Permissions("CAN_CREATE_SALE")
   @Get("sale")

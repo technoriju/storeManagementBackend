@@ -1,10 +1,16 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsBoolean, IsNumber, IsEnum } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import {
+  IsString,
+  IsOptional,
+  IsBoolean,
+  IsNumber,
+  IsEnum,
+} from "class-validator";
 
 export class CreateSubCategoriesDto {
   @ApiProperty()
-  @IsString()
-  categoryId: string;
+  @IsNumber()
+  categoryId: number;
 
   @ApiProperty()
   @IsString()

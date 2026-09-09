@@ -7,7 +7,7 @@ import { User, Prisma } from "@prisma/client";
 export class UserRepository implements IUserRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findById(id: string): Promise<User | null> {
+  async findById(id: any): Promise<User | null> {
     return this.prisma.user.findFirst({ where: { id, deletedAt: null } });
   }
 
@@ -34,14 +34,14 @@ export class UserRepository implements IUserRepository {
     return this.prisma.user.create({ data });
   }
 
-  async update(id: string, data: Prisma.UserUpdateInput): Promise<User> {
+  async update(id: any, data: Prisma.UserUpdateInput): Promise<User> {
     return this.prisma.user.update({
       where: { id },
       data,
     });
   }
 
-  async delete(id: string): Promise<User> {
+  async delete(id: any): Promise<User> {
     return this.prisma.user.update({
       where: { id },
       data: { deletedAt: new Date() },

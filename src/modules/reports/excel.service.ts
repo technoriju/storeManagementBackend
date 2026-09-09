@@ -332,7 +332,7 @@ export class ExcelService {
             }
 
             // 2. Resolve Category
-            let categoryId: string | null = null;
+            let categoryId: number | null = null;
             if (categoryName) {
               let category = await tx.category.findFirst({
                 where: { name: { equals: categoryName } },
@@ -346,7 +346,7 @@ export class ExcelService {
             }
 
             // 3. Resolve Brand
-            let brandId: string | null = null;
+            let brandId: number | null = null;
             if (brandName) {
               let brand = await tx.brand.findFirst({
                 where: { name: { equals: brandName } },
@@ -360,7 +360,7 @@ export class ExcelService {
             }
 
             // 4. Resolve Tax Rate
-            let taxRateId: string | null = null;
+            let taxRateId: number | null = null;
             if (taxRateVal > 0) {
               const halfRate = taxRateVal / 2;
               let taxRate = await tx.taxRate.findFirst({
