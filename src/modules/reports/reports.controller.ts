@@ -19,7 +19,7 @@ import { ExcelService } from "./excel.service";
 import { ReportFiltersDto } from "./dto/report-filters.dto";
 
 @ApiTags("reports")
-@Controller(["reports", "api/reports"])
+@Controller("reports")
 export class ReportsController {
   constructor(
     private readonly reportsService: ReportsService,

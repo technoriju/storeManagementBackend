@@ -58,7 +58,7 @@ describe("AuthController", () => {
         accessToken: "new",
         refreshToken: "new-refresh",
       });
-      const result = await controller.refresh("old-refresh");
+      const result = await controller.refresh({ refreshToken: "old-refresh" });
       expect(result).toEqual({
         accessToken: "new",
         refreshToken: "new-refresh",
@@ -69,7 +69,7 @@ describe("AuthController", () => {
   describe("logout", () => {
     it("should call logout on service", async () => {
       mockAuthService.logout.mockResolvedValue({ success: true });
-      const result = await controller.logout("refresh-tok");
+      const result = await controller.logout({ refreshToken: "refresh-tok" });
       expect(mockAuthService.logout).toHaveBeenCalledWith("refresh-tok");
       expect(result).toEqual({ success: true });
     });

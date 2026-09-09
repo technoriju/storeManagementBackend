@@ -19,7 +19,7 @@ import { Permissions } from "./decorators/permissions.decorator";
 import { LoginDto, RefreshTokenDto, RegisterDto } from "./dto/auth.dto";
 
 @ApiTags('Auth')
-@Controller("api/auth")
+@Controller("auth")
 export class AuthController {
   constructor(private authService: AuthService) {}
 
