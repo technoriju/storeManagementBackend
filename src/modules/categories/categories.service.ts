@@ -16,10 +16,11 @@ export class CategoriesService {
   async findAll() {
     return this.prisma.category.findMany({
       where: { deletedAt: null },
+      orderBy: { id: 'desc' },
     });
   }
 
-  async findOne(id: any) {
+  async findOne(id: number) {
     const category = await this.prisma.category.findFirst({
       where: { id, deletedAt: null },
       include: {
@@ -34,7 +35,7 @@ export class CategoriesService {
     return category;
   }
 
-  async update(id: any, updateCategoryDto: UpdateCategoryDto) {
+  async update(id: number, updateCategoryDto: UpdateCategoryDto) {
     const category = await this.prisma.category.findFirst({
       where: { id, deletedAt: null },
     });
@@ -52,7 +53,7 @@ export class CategoriesService {
     });
   }
 
-  async remove(id: any) {
+  async remove(id: number) {
     const category = await this.prisma.category.findFirst({
       where: { id, deletedAt: null },
     });

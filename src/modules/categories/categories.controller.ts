@@ -36,18 +36,18 @@ export class CategoriesController {
   @ApiOperation({ summary: "Get a category by id" })
   @Get(":id")
   findOne(@Param("id") id: any) {
-    return this.categoriesService.findOne(id);
+    return this.categoriesService.findOne(+id);
   }
 
   @ApiOperation({ summary: "Update a category by id" })
   @Patch(":id")
   update(@Param("id") id: any, @Body() updateCategoryDto: UpdateCategoryDto) {
-    return this.categoriesService.update(id, updateCategoryDto);
+    return this.categoriesService.update(+id, updateCategoryDto);
   }
 
   @ApiOperation({ summary: "Delete a category by id" })
   @Delete(":id")
   remove(@Param("id") id: any) {
-    return this.categoriesService.remove(id);
+    return this.categoriesService.remove(+id);
   }
 }
