@@ -19,6 +19,7 @@ model Company {
   gstin   String?
   address String?
 
+  status    String    @default("ACTIVE")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -37,6 +38,7 @@ model Branch {
   address   String?
   phone     String?
 
+  status    String    @default("ACTIVE")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -59,6 +61,7 @@ model Warehouse {
   code     String?
   address  String?
 
+  status    String    @default("ACTIVE")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -78,6 +81,7 @@ model Device {
   name        String
   deviceToken String? @unique
 
+  status    String    @default("ACTIVE")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -99,6 +103,7 @@ model User {
   phone        String?
   isActive     Boolean @default(true)
 
+  status    String    @default("ACTIVE")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -118,6 +123,7 @@ model Role {
   name        String
   description String?
 
+  status    String    @default("ACTIVE")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -133,6 +139,7 @@ model Permission {
   action      String
   description String?
 
+  status    String    @default("ACTIVE")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -147,6 +154,7 @@ model RolePermission {
   roleId       Int
   permissionId Int
 
+  status    String    @default("ACTIVE")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -168,6 +176,7 @@ model Category {
   name        String
   description String?
 
+  status    String    @default("ACTIVE")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -184,6 +193,7 @@ model SubCategory {
   name        String
   description String?
 
+  status    String    @default("ACTIVE")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -199,6 +209,7 @@ model Brand {
   name        String
   description String?
 
+  status    String    @default("ACTIVE")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -213,6 +224,7 @@ model Unit {
   name      String
   shortName String
 
+  status    String    @default("ACTIVE")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -231,6 +243,7 @@ model TaxRate {
   sgstRate Decimal @db.Decimal(5, 2)
   igstRate Decimal @db.Decimal(5, 2)
 
+  status    String    @default("ACTIVE")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -273,6 +286,7 @@ model Product {
   lowStockLevel Decimal? @db.Decimal(12, 4)
   reorderLevel  Decimal? @db.Decimal(12, 4)
 
+  status    String    @default("ACTIVE")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -304,6 +318,7 @@ model ProductUnit {
   unitId           Int
   conversionFactor Decimal @db.Decimal(10, 4)
 
+  status    String    @default("ACTIVE")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -330,6 +345,7 @@ model ProductPrice {
   priceType     String
   price         Decimal @db.Decimal(12, 2)
 
+  status    String    @default("ACTIVE")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -355,6 +371,7 @@ model Customer {
   gstin       String?
   creditLimit Decimal? @db.Decimal(12, 2)
 
+  status    String    @default("ACTIVE")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -372,6 +389,7 @@ model Supplier {
   address String?
   gstin   String?
 
+  status    String    @default("ACTIVE")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -425,6 +443,7 @@ model PurchaseItem {
   taxAmount Decimal @db.Decimal(12, 2)
   total     Decimal @db.Decimal(12, 2)
 
+  status    String    @default("ACTIVE")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -441,6 +460,7 @@ model PurchasePayment {
   purchaseId BigInt
   paymentId  BigInt
 
+  status    String    @default("ACTIVE")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -458,6 +478,7 @@ model PurchaseReturn {
   reason      String?
   totalAmount Decimal  @db.Decimal(12, 2)
 
+  status    String    @default("ACTIVE")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -507,6 +528,7 @@ model SaleItem {
   taxAmount Decimal @db.Decimal(12, 2)
   total     Decimal @db.Decimal(12, 2)
 
+  status    String    @default("ACTIVE")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -523,6 +545,7 @@ model SalePayment {
   saleId    BigInt
   paymentId BigInt
 
+  status    String    @default("ACTIVE")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -540,6 +563,7 @@ model SaleReturn {
   reason      String?
   totalAmount Decimal  @db.Decimal(12, 2)
 
+  status    String    @default("ACTIVE")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -556,6 +580,7 @@ model Payment {
   paymentMethod   String
   referenceNumber String?
 
+  status    String    @default("ACTIVE")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -575,6 +600,7 @@ model Expense {
   category    String
   description String?
 
+  status    String    @default("ACTIVE")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -600,6 +626,7 @@ model StockTransaction {
   unitQuantity Decimal @db.Decimal(12, 4)
   baseQuantity Decimal @db.Decimal(12, 4)
 
+  status    String    @default("ACTIVE")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -619,6 +646,7 @@ model StockBalance {
   warehouseId Int
   quantity    Decimal @db.Decimal(12, 4)
 
+  status    String    @default("ACTIVE")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
