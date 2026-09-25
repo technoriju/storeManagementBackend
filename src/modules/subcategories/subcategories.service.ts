@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException, ConflictException } from "@nestjs/common";
 import { PrismaService } from "../../infrastructure/data-access/prisma/prisma.service";
 import { CreateSubCategoriesDto } from "./dto/create-subcategory.dto";
 import { UpdateSubCategoriesDto } from "./dto/update-subcategory.dto";
@@ -8,6 +8,13 @@ export class SubCategoriesService {
   constructor(private prisma: PrismaService) {}
 
   async create(createSubCategoriesDto: CreateSubCategoriesDto) {
+    const existing = await this.prisma.subCategory.findFirst({
+      where: { name: createSubCategoriesDto.name, deletedAt: null },
+    });
+    if (existing) {
+      throw new ConflictException("Subcategory name already exists");
+    }
+
     return this.prisma.subCategory.create({
       data: createSubCategoriesDto,
     });
@@ -30,7 +37,17 @@ export class SubCategoriesService {
   }
 
   async update(id: any, updateSubCategoriesDto: UpdateSubCategoriesDto) {
-    await this.findOne(id);
+    const item = await this.findOne(id);
+
+    if (updateSubCategoriesDto.name && updateSubCategoriesDto.name !== item.name) {
+      const existing = await this.prisma.subCategory.findFirst({
+        where: { name: updateSubCategoriesDto.name, id: { not: id }, deletedAt: null },
+      });
+      if (existing) {
+        throw new ConflictException("Subcategory name already exists");
+      }
+    }
+
     return this.prisma.subCategory.update({
       where: { id },
       data: updateSubCategoriesDto,

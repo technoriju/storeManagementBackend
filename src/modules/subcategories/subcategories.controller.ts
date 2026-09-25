@@ -36,7 +36,7 @@ export class SubCategoriesController {
   @ApiOperation({ summary: "Get a subcategory by id" })
   @Get(":id")
   findOne(@Param("id") id: any) {
-    return this.subcategoriesService.findOne(id);
+    return this.subcategoriesService.findOne(+id);
   }
 
   @ApiOperation({ summary: "Update a subcategory by id" })
@@ -45,12 +45,12 @@ export class SubCategoriesController {
     @Param("id") id: any,
     @Body() updateSubCategoriesDto: UpdateSubCategoriesDto,
   ) {
-    return this.subcategoriesService.update(id, updateSubCategoriesDto);
+    return this.subcategoriesService.update(+id, updateSubCategoriesDto);
   }
 
   @ApiOperation({ summary: "Delete a subcategory by id" })
   @Delete(":id")
   remove(@Param("id") id: any) {
-    return this.subcategoriesService.remove(id);
+    return this.subcategoriesService.remove(+id);
   }
 }

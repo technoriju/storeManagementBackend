@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException, ConflictException } from "@nestjs/common";
 import { PrismaService } from "../../infrastructure/data-access/prisma/prisma.service";
 import { CreateCategoryDto } from "./dto/create-category.dto";
 import { UpdateCategoryDto } from "./dto/update-category.dto";
@@ -8,6 +8,13 @@ export class CategoriesService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(createCategoryDto: CreateCategoryDto) {
+    const existing = await this.prisma.category.findFirst({
+      where: { name: createCategoryDto.name, deletedAt: null },
+    });
+    if (existing) {
+      throw new ConflictException("Category name already exists");
+    }
+
     return this.prisma.category.create({
       data: createCategoryDto,
     });
@@ -42,6 +49,15 @@ export class CategoriesService {
 
     if (!category) {
       throw new NotFoundException(`Category with ID ${id} not found`);
+    }
+
+    if (updateCategoryDto.name && updateCategoryDto.name !== category.name) {
+      const existing = await this.prisma.category.findFirst({
+        where: { name: updateCategoryDto.name, id: { not: id }, deletedAt: null },
+      });
+      if (existing) {
+        throw new ConflictException("Category name already exists");
+      }
     }
 
     return this.prisma.category.update({
