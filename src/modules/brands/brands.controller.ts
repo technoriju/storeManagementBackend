@@ -9,43 +9,43 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiBearerAuth } from "@nestjs/swagger";
-import { UnitsService } from "./units.service";
-import { CreateUnitDto } from "./dto/create-unit.dto";
-import { UpdateUnitDto } from "./dto/update-unit.dto";
+import { BrandsService } from "./brands.service";
+import { CreateBrandDto } from "./dto/create-brand.dto";
+import { UpdateBrandDto } from "./dto/update-brand.dto";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 
-@ApiTags("Units")
+@ApiTags("Brands")
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
-@Controller("units")
-export class UnitsController {
-  constructor(private readonly service: UnitsService) {}
+@Controller("brands")
+export class BrandsController {
+  constructor(private readonly service: BrandsService) {}
 
-  @ApiOperation({ summary: "Create a new unit" })
+  @ApiOperation({ summary: "Create a new brand" })
   @Post()
-  create(@Body() createDto: CreateUnitDto) {
+  create(@Body() createDto: CreateBrandDto) {
     return this.service.create(createDto);
   }
 
-  @ApiOperation({ summary: "Get all units" })
+  @ApiOperation({ summary: "Get all brands" })
   @Get()
   findAll() {
     return this.service.findAll();
   }
 
-  @ApiOperation({ summary: "Get a unit by id" })
+  @ApiOperation({ summary: "Get a brand by id" })
   @Get(":id")
   findOne(@Param("id") id: string) {
     return this.service.findOne(+id);
   }
 
-  @ApiOperation({ summary: "Update a unit by id" })
+  @ApiOperation({ summary: "Update a brand by id" })
   @Patch(":id")
-  update(@Param("id") id: string, @Body() updateDto: UpdateUnitDto) {
+  update(@Param("id") id: string, @Body() updateDto: UpdateBrandDto) {
     return this.service.update(+id, updateDto);
   }
 
-  @ApiOperation({ summary: "Delete a unit by id" })
+  @ApiOperation({ summary: "Delete a brand by id" })
   @Delete(":id")
   remove(@Param("id") id: string) {
     return this.service.remove(+id);

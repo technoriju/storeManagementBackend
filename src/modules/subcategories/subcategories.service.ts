@@ -23,6 +23,7 @@ export class SubCategoriesService {
   async findAll() {
     return this.prisma.subCategory.findMany({
       where: { deletedAt: null },
+      orderBy: { id: 'desc' },
     });
   }
 

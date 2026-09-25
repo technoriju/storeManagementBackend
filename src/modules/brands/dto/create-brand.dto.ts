@@ -1,16 +1,16 @@
 import { IsString, IsOptional, IsNotEmpty, IsNumber } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
-export class CreateUnitDto {
-  @ApiProperty({ description: "Name of the unit" })
+export class CreateBrandDto {
+  @ApiProperty({ description: "Name of the brand" })
   @IsString()
   @IsNotEmpty()
   name: string;
 
-  @ApiProperty({ description: "Short name of the unit" })
+  @ApiPropertyOptional({ description: "Description" })
   @IsString()
-  @IsNotEmpty()
-  shortName: string;
+  @IsOptional()
+  description?: string;
 
   @ApiPropertyOptional({ description: "Device ID" })
   @IsString()

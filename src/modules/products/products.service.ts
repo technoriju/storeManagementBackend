@@ -17,6 +17,7 @@ export class ProductsService {
   async findAll() {
     return this.prisma.product.findMany({
       where: { deletedAt: null },
+      orderBy: { id: 'desc' },
     });
   }
 

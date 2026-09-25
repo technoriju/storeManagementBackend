@@ -203,4 +203,10 @@ export class AuthService {
 
     return this.login(userWithRelations);
   }
+
+  async getPermissions() {
+    return this.prisma.permission.findMany({
+      select: { id: true, action: true, description: true }
+    });
+  }
 }

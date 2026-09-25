@@ -99,4 +99,12 @@ export class AuthController {
   saleRoute() {
     return { message: "Can create sale" };
   }
+
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Get all permissions" })
+  @UseGuards(JwtAuthGuard)
+  @Get("permissions")
+  async getPermissions() {
+    return this.authService.getPermissions();
+  }
 }
