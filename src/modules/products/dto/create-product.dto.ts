@@ -108,4 +108,9 @@ export class CreateProductsDto {
   @IsNumber()
   @IsOptional()
   reorderLevel?: number;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  status?: string;
 }

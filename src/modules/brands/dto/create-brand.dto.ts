@@ -16,4 +16,9 @@ export class CreateBrandDto {
   @IsString()
   @IsOptional()
   deviceId?: string;
+
+  @ApiPropertyOptional({ description: "Status" })
+  @IsString()
+  @IsOptional()
+  status?: string;
 }

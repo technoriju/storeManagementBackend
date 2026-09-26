@@ -234,6 +234,26 @@ model Unit {
   baseProducts      Product[]          @relation("ProductBaseUnit")
   productUnits      ProductUnit[]
   stockTransactions StockTransaction[]
+  subUnits           SubUnit[]
+}
+
+model SubUnit {
+  id           Int      @id @default(autoincrement())
+  name         String
+  parentUnitId Int
+  multiplier   Float    @default(1)
+
+  status    String    @default("ACTIVE")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  version   Int       @default(1)
+  deviceId  String?
+
+  parentUnit Unit @relation(fields: [parentUnitId], references: [id])
+
+  @@index([parentUnitId])
+  @@unique([parentUnitId, name])
 }
 
 model TaxRate {

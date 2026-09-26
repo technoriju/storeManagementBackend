@@ -30,6 +30,7 @@ import { AuditModule } from "./modules/audit/audit.module";
 import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
 import { APP_GUARD } from "@nestjs/core";
 import { SubCategoriesModule } from "./modules/subcategories/subcategories.module";
+import { SubUnitsModule } from "./modules/subunits/subunits.module";
 
 // We will import feature modules here
 
@@ -72,6 +73,7 @@ import { SubCategoriesModule } from "./modules/subcategories/subcategories.modul
       },
     ]),
     SubCategoriesModule,
+    SubUnitsModule,
     // Add other feature modules here as they are developed
   ],
   providers: [
