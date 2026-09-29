@@ -20,6 +20,36 @@ export class CustomersService {
     });
   }
 
+  async sync(payloads: any[]) {
+    const results = [];
+    for (const payload of payloads) {
+      const { id, ...data } = payload;
+      if (id) {
+        try {
+          const updated = await this.update(Number(id), data);
+          results.push(updated);
+        } catch (error) {
+          if (error instanceof NotFoundException) {
+            try {
+              const created = await this.create(data);
+              results.push({ ...created, _clientTempId: id });
+            } catch (createError) {
+              // ignore or handle error
+            }
+          }
+        }
+      } else {
+        try {
+          const created = await this.create(data);
+          results.push(created);
+        } catch (error) {
+          // ignore or handle error
+        }
+      }
+    }
+    return results;
+  }
+
   async findAll() {
     return this.prisma.customer.findMany({
       where: { deletedAt: null },

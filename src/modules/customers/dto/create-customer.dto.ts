@@ -27,11 +27,6 @@ export class CreateCustomerDto {
   @IsOptional()
   gstin?: string;
 
-  @ApiPropertyOptional()
-  @IsNumber()
-  @IsOptional()
-  creditLimit?: number;
-
   @ApiPropertyOptional({ description: "Device ID" })
   @IsString()
   @IsOptional()

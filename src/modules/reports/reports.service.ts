@@ -666,17 +666,11 @@ export class ReportsService {
         name: customer.name,
         phone: customer.phone || "",
         gstin: customer.gstin || "",
-        creditLimit: customer.creditLimit
-          ? this.toNumber(customer.creditLimit)
-          : null,
         totalSalesCount: customer.sales.length,
         totalBilled: Number(totalBilled.toFixed(2)),
         totalPaid: Number(totalPaid.toFixed(2)),
         totalReturned: Number(totalReturned.toFixed(2)),
         outstandingBalance: outstanding,
-        isOverCreditLimit: customer.creditLimit
-          ? outstanding > this.toNumber(customer.creditLimit)
-          : false,
       };
     });
 

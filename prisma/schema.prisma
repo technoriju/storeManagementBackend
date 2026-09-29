@@ -234,14 +234,14 @@ model Unit {
   baseProducts      Product[]          @relation("ProductBaseUnit")
   productUnits      ProductUnit[]
   stockTransactions StockTransaction[]
-  subUnits           SubUnit[]
+  subUnits          SubUnit[]
 }
 
 model SubUnit {
-  id           Int      @id @default(autoincrement())
+  id           Int    @id @default(autoincrement())
   name         String
   parentUnitId Int
-  multiplier   Float    @default(1)
+  multiplier   Float  @default(1)
 
   status    String    @default("ACTIVE")
   createdAt DateTime  @default(now())
@@ -252,8 +252,8 @@ model SubUnit {
 
   parentUnit Unit @relation(fields: [parentUnitId], references: [id])
 
-  @@index([parentUnitId])
   @@unique([parentUnitId, name])
+  @@index([parentUnitId])
 }
 
 model TaxRate {
@@ -383,13 +383,12 @@ model ProductPrice {
 // ==========================================
 
 model Customer {
-  id          Int      @id @default(autoincrement())
-  name        String
-  phone       String?
-  email       String?
-  address     String?
-  gstin       String?
-  creditLimit Decimal? @db.Decimal(12, 2)
+  id      Int     @id @default(autoincrement())
+  name    String
+  phone   String?
+  email   String?
+  address String?
+  gstin   String?
 
   status    String    @default("ACTIVE")
   createdAt DateTime  @default(now())
