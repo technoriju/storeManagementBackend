@@ -4,8 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "db:migrate": "prisma migrate deploy",
-    "build": "nest build",
+    "db:deploy": "prisma migrate deploy",
+    "build": "prisma generate && prisma migrate deploy && nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
