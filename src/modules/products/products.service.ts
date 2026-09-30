@@ -34,6 +34,16 @@ export class ProductsService {
     if (data.lowStockThreshold !== undefined && data.lowStockLevel === undefined) data.lowStockLevel = data.lowStockThreshold;
     if (data.hsn && !data.hsnCode) data.hsnCode = data.hsn;
     
+    if (data.categoryId !== undefined) {
+      data.categoryId = data.categoryId ? Number(data.categoryId) : null;
+    }
+    if (data.subCategoryId !== undefined) {
+      data.subCategoryId = data.subCategoryId ? Number(data.subCategoryId) : null;
+    }
+    if (data.brandId !== undefined) {
+      data.brandId = data.brandId ? Number(data.brandId) : null;
+    }
+    
     // Remove offline/unmapped fields so Prisma doesn't crash
     delete data.id;
     delete data.price;
@@ -68,8 +78,14 @@ export class ProductsService {
   }
 
   async findOne(id: any) {
+    let bigId: bigint;
+    try {
+      bigId = BigInt(id);
+    } catch {
+      throw new NotFoundException("Invalid product id");
+    }
     const item = await this.prisma.product.findFirst({
-      where: { id: BigInt(id), deletedAt: null },
+      where: { id: bigId, deletedAt: null },
     });
     if (!item) {
       throw new NotFoundException("Products not found");
