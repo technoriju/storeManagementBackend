@@ -122,217 +122,217 @@
 
 */
 -- DropForeignKey
-ALTER TABLE `auditlog` DROP FOREIGN KEY `AuditLog_userId_fkey`;
+ALTER TABLE `AuditLog` DROP FOREIGN KEY `AuditLog_userId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `branch` DROP FOREIGN KEY `Branch_companyId_fkey`;
+ALTER TABLE `Branch` DROP FOREIGN KEY `Branch_companyId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `device` DROP FOREIGN KEY `Device_branchId_fkey`;
+ALTER TABLE `Device` DROP FOREIGN KEY `Device_branchId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `expense` DROP FOREIGN KEY `Expense_branchId_fkey`;
+ALTER TABLE `Expense` DROP FOREIGN KEY `Expense_branchId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `expense` DROP FOREIGN KEY `Expense_userId_fkey`;
+ALTER TABLE `Expense` DROP FOREIGN KEY `Expense_userId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `invoicetemplatesetting` DROP FOREIGN KEY `InvoiceTemplateSetting_templateId_fkey`;
+ALTER TABLE `InvoiceTemplateSetting` DROP FOREIGN KEY `InvoiceTemplateSetting_templateId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `product` DROP FOREIGN KEY `Product_baseUnitId_fkey`;
+ALTER TABLE `Product` DROP FOREIGN KEY `Product_baseUnitId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `product` DROP FOREIGN KEY `Product_brandId_fkey`;
+ALTER TABLE `Product` DROP FOREIGN KEY `Product_brandId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `product` DROP FOREIGN KEY `Product_categoryId_fkey`;
+ALTER TABLE `Product` DROP FOREIGN KEY `Product_categoryId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `product` DROP FOREIGN KEY `Product_defaultPurchaseUnitId_fkey`;
+ALTER TABLE `Product` DROP FOREIGN KEY `Product_defaultPurchaseUnitId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `product` DROP FOREIGN KEY `Product_defaultSalesUnitId_fkey`;
+ALTER TABLE `Product` DROP FOREIGN KEY `Product_defaultSalesUnitId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `product` DROP FOREIGN KEY `Product_subCategoryId_fkey`;
+ALTER TABLE `Product` DROP FOREIGN KEY `Product_subCategoryId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `product` DROP FOREIGN KEY `Product_taxRateId_fkey`;
+ALTER TABLE `Product` DROP FOREIGN KEY `Product_taxRateId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `productprice` DROP FOREIGN KEY `ProductPrice_productId_fkey`;
+ALTER TABLE `ProductPrice` DROP FOREIGN KEY `ProductPrice_productId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `productprice` DROP FOREIGN KEY `ProductPrice_productUnitId_fkey`;
+ALTER TABLE `ProductPrice` DROP FOREIGN KEY `ProductPrice_productUnitId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `productunit` DROP FOREIGN KEY `ProductUnit_productId_fkey`;
+ALTER TABLE `ProductUnit` DROP FOREIGN KEY `ProductUnit_productId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `productunit` DROP FOREIGN KEY `ProductUnit_unitId_fkey`;
+ALTER TABLE `ProductUnit` DROP FOREIGN KEY `ProductUnit_unitId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `purchase` DROP FOREIGN KEY `Purchase_branchId_fkey`;
+ALTER TABLE `Purchase` DROP FOREIGN KEY `Purchase_branchId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `purchase` DROP FOREIGN KEY `Purchase_supplierId_fkey`;
+ALTER TABLE `Purchase` DROP FOREIGN KEY `Purchase_supplierId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `purchase` DROP FOREIGN KEY `Purchase_warehouseId_fkey`;
+ALTER TABLE `Purchase` DROP FOREIGN KEY `Purchase_warehouseId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `purchaseitem` DROP FOREIGN KEY `PurchaseItem_productId_fkey`;
+ALTER TABLE `PurchaseItem` DROP FOREIGN KEY `PurchaseItem_productId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `purchaseitem` DROP FOREIGN KEY `PurchaseItem_productUnitId_fkey`;
+ALTER TABLE `PurchaseItem` DROP FOREIGN KEY `PurchaseItem_productUnitId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `purchaseitem` DROP FOREIGN KEY `PurchaseItem_purchaseId_fkey`;
+ALTER TABLE `PurchaseItem` DROP FOREIGN KEY `PurchaseItem_purchaseId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `purchasepayment` DROP FOREIGN KEY `PurchasePayment_paymentId_fkey`;
+ALTER TABLE `PurchasePayment` DROP FOREIGN KEY `PurchasePayment_paymentId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `purchasepayment` DROP FOREIGN KEY `PurchasePayment_purchaseId_fkey`;
+ALTER TABLE `PurchasePayment` DROP FOREIGN KEY `PurchasePayment_purchaseId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `purchasereturn` DROP FOREIGN KEY `PurchaseReturn_purchaseId_fkey`;
+ALTER TABLE `PurchaseReturn` DROP FOREIGN KEY `PurchaseReturn_purchaseId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `refreshtoken` DROP FOREIGN KEY `RefreshToken_userId_fkey`;
+ALTER TABLE `RefreshToken` DROP FOREIGN KEY `RefreshToken_userId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `rolepermission` DROP FOREIGN KEY `RolePermission_permissionId_fkey`;
+ALTER TABLE `RolePermission` DROP FOREIGN KEY `RolePermission_permissionId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `rolepermission` DROP FOREIGN KEY `RolePermission_roleId_fkey`;
+ALTER TABLE `RolePermission` DROP FOREIGN KEY `RolePermission_roleId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `sale` DROP FOREIGN KEY `Sale_branchId_fkey`;
+ALTER TABLE `Sale` DROP FOREIGN KEY `Sale_branchId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `sale` DROP FOREIGN KEY `Sale_customerId_fkey`;
+ALTER TABLE `Sale` DROP FOREIGN KEY `Sale_customerId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `sale` DROP FOREIGN KEY `Sale_warehouseId_fkey`;
+ALTER TABLE `Sale` DROP FOREIGN KEY `Sale_warehouseId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `saleitem` DROP FOREIGN KEY `SaleItem_productId_fkey`;
+ALTER TABLE `SaleItem` DROP FOREIGN KEY `SaleItem_productId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `saleitem` DROP FOREIGN KEY `SaleItem_productUnitId_fkey`;
+ALTER TABLE `SaleItem` DROP FOREIGN KEY `SaleItem_productUnitId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `saleitem` DROP FOREIGN KEY `SaleItem_saleId_fkey`;
+ALTER TABLE `SaleItem` DROP FOREIGN KEY `SaleItem_saleId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `salepayment` DROP FOREIGN KEY `SalePayment_paymentId_fkey`;
+ALTER TABLE `SalePayment` DROP FOREIGN KEY `SalePayment_paymentId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `salepayment` DROP FOREIGN KEY `SalePayment_saleId_fkey`;
+ALTER TABLE `SalePayment` DROP FOREIGN KEY `SalePayment_saleId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `salereturn` DROP FOREIGN KEY `SaleReturn_saleId_fkey`;
+ALTER TABLE `SaleReturn` DROP FOREIGN KEY `SaleReturn_saleId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `stockbalance` DROP FOREIGN KEY `StockBalance_productId_fkey`;
+ALTER TABLE `StockBalance` DROP FOREIGN KEY `StockBalance_productId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `stockbalance` DROP FOREIGN KEY `StockBalance_warehouseId_fkey`;
+ALTER TABLE `StockBalance` DROP FOREIGN KEY `StockBalance_warehouseId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `stocktransaction` DROP FOREIGN KEY `StockTransaction_productId_fkey`;
+ALTER TABLE `StockTransaction` DROP FOREIGN KEY `StockTransaction_productId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `stocktransaction` DROP FOREIGN KEY `StockTransaction_unitId_fkey`;
+ALTER TABLE `StockTransaction` DROP FOREIGN KEY `StockTransaction_unitId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `stocktransaction` DROP FOREIGN KEY `StockTransaction_warehouseId_fkey`;
+ALTER TABLE `StockTransaction` DROP FOREIGN KEY `StockTransaction_warehouseId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `subcategory` DROP FOREIGN KEY `SubCategory_categoryId_fkey`;
+ALTER TABLE `SubCategory` DROP FOREIGN KEY `SubCategory_categoryId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `user` DROP FOREIGN KEY `User_branchId_fkey`;
+ALTER TABLE `User` DROP FOREIGN KEY `User_branchId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `user` DROP FOREIGN KEY `User_companyId_fkey`;
+ALTER TABLE `User` DROP FOREIGN KEY `User_companyId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `user` DROP FOREIGN KEY `User_roleId_fkey`;
+ALTER TABLE `User` DROP FOREIGN KEY `User_roleId_fkey`;
 
 -- DropForeignKey
-ALTER TABLE `warehouse` DROP FOREIGN KEY `Warehouse_branchId_fkey`;
+ALTER TABLE `Warehouse` DROP FOREIGN KEY `Warehouse_branchId_fkey`;
 
 -- AlterTable
-ALTER TABLE `auditlog` DROP PRIMARY KEY,
+ALTER TABLE `AuditLog` DROP PRIMARY KEY,
     MODIFY `id` BIGINT NOT NULL AUTO_INCREMENT,
     MODIFY `userId` INTEGER NULL,
     ADD PRIMARY KEY (`id`);
 
 -- AlterTable
-ALTER TABLE `branch` DROP PRIMARY KEY,
+ALTER TABLE `Branch` DROP PRIMARY KEY,
     MODIFY `id` INTEGER NOT NULL AUTO_INCREMENT,
     MODIFY `companyId` INTEGER NOT NULL,
     ADD PRIMARY KEY (`id`);
 
 -- AlterTable
-ALTER TABLE `brand` DROP PRIMARY KEY,
+ALTER TABLE `Brand` DROP PRIMARY KEY,
     MODIFY `id` INTEGER NOT NULL AUTO_INCREMENT,
     ADD PRIMARY KEY (`id`);
 
 -- AlterTable
-ALTER TABLE `category` DROP PRIMARY KEY,
+ALTER TABLE `Category` DROP PRIMARY KEY,
     MODIFY `id` INTEGER NOT NULL AUTO_INCREMENT,
     ADD PRIMARY KEY (`id`);
 
 -- AlterTable
-ALTER TABLE `company` DROP PRIMARY KEY,
+ALTER TABLE `Company` DROP PRIMARY KEY,
     MODIFY `id` INTEGER NOT NULL AUTO_INCREMENT,
     ADD PRIMARY KEY (`id`);
 
 -- AlterTable
-ALTER TABLE `customer` DROP PRIMARY KEY,
+ALTER TABLE `Customer` DROP PRIMARY KEY,
     MODIFY `id` INTEGER NOT NULL AUTO_INCREMENT,
     ADD PRIMARY KEY (`id`);
 
 -- AlterTable
-ALTER TABLE `device` DROP PRIMARY KEY,
+ALTER TABLE `Device` DROP PRIMARY KEY,
     MODIFY `id` INTEGER NOT NULL AUTO_INCREMENT,
     MODIFY `branchId` INTEGER NULL,
     ADD PRIMARY KEY (`id`);
 
 -- AlterTable
-ALTER TABLE `expense` DROP PRIMARY KEY,
+ALTER TABLE `Expense` DROP PRIMARY KEY,
     MODIFY `id` BIGINT NOT NULL AUTO_INCREMENT,
     MODIFY `branchId` INTEGER NOT NULL,
     MODIFY `userId` INTEGER NOT NULL,
     ADD PRIMARY KEY (`id`);
 
 -- AlterTable
-ALTER TABLE `invoicetemplate` DROP PRIMARY KEY,
+ALTER TABLE `InvoiceTemplate` DROP PRIMARY KEY,
     MODIFY `id` INTEGER NOT NULL AUTO_INCREMENT,
     ADD PRIMARY KEY (`id`);
 
 -- AlterTable
-ALTER TABLE `invoicetemplatesetting` DROP PRIMARY KEY,
+ALTER TABLE `InvoiceTemplateSetting` DROP PRIMARY KEY,
     MODIFY `id` INTEGER NOT NULL AUTO_INCREMENT,
     MODIFY `templateId` INTEGER NOT NULL,
     ADD PRIMARY KEY (`id`);
 
 -- AlterTable
-ALTER TABLE `payment` DROP PRIMARY KEY,
+ALTER TABLE `Payment` DROP PRIMARY KEY,
     MODIFY `id` BIGINT NOT NULL AUTO_INCREMENT,
     ADD PRIMARY KEY (`id`);
 
 -- AlterTable
-ALTER TABLE `permission` DROP PRIMARY KEY,
+ALTER TABLE `Permission` DROP PRIMARY KEY,
     MODIFY `id` INTEGER NOT NULL AUTO_INCREMENT,
     ADD PRIMARY KEY (`id`);
 
 -- AlterTable
-ALTER TABLE `product` DROP PRIMARY KEY,
+ALTER TABLE `Product` DROP PRIMARY KEY,
     MODIFY `id` BIGINT NOT NULL AUTO_INCREMENT,
     MODIFY `categoryId` INTEGER NULL,
     MODIFY `subCategoryId` INTEGER NULL,
@@ -344,21 +344,21 @@ ALTER TABLE `product` DROP PRIMARY KEY,
     ADD PRIMARY KEY (`id`);
 
 -- AlterTable
-ALTER TABLE `productprice` DROP PRIMARY KEY,
+ALTER TABLE `ProductPrice` DROP PRIMARY KEY,
     MODIFY `id` BIGINT NOT NULL AUTO_INCREMENT,
     MODIFY `productId` BIGINT NOT NULL,
     MODIFY `productUnitId` BIGINT NOT NULL,
     ADD PRIMARY KEY (`id`);
 
 -- AlterTable
-ALTER TABLE `productunit` DROP PRIMARY KEY,
+ALTER TABLE `ProductUnit` DROP PRIMARY KEY,
     MODIFY `id` BIGINT NOT NULL AUTO_INCREMENT,
     MODIFY `productId` BIGINT NOT NULL,
     MODIFY `unitId` INTEGER NOT NULL,
     ADD PRIMARY KEY (`id`);
 
 -- AlterTable
-ALTER TABLE `purchase` DROP PRIMARY KEY,
+ALTER TABLE `Purchase` DROP PRIMARY KEY,
     MODIFY `id` BIGINT NOT NULL AUTO_INCREMENT,
     MODIFY `branchId` INTEGER NOT NULL,
     MODIFY `warehouseId` INTEGER NOT NULL,
@@ -366,7 +366,7 @@ ALTER TABLE `purchase` DROP PRIMARY KEY,
     ADD PRIMARY KEY (`id`);
 
 -- AlterTable
-ALTER TABLE `purchaseitem` DROP PRIMARY KEY,
+ALTER TABLE `PurchaseItem` DROP PRIMARY KEY,
     MODIFY `id` BIGINT NOT NULL AUTO_INCREMENT,
     MODIFY `purchaseId` BIGINT NOT NULL,
     MODIFY `productId` BIGINT NOT NULL,
@@ -374,38 +374,38 @@ ALTER TABLE `purchaseitem` DROP PRIMARY KEY,
     ADD PRIMARY KEY (`id`);
 
 -- AlterTable
-ALTER TABLE `purchasepayment` DROP PRIMARY KEY,
+ALTER TABLE `PurchasePayment` DROP PRIMARY KEY,
     MODIFY `id` BIGINT NOT NULL AUTO_INCREMENT,
     MODIFY `purchaseId` BIGINT NOT NULL,
     MODIFY `paymentId` BIGINT NOT NULL,
     ADD PRIMARY KEY (`id`);
 
 -- AlterTable
-ALTER TABLE `purchasereturn` DROP PRIMARY KEY,
+ALTER TABLE `PurchaseReturn` DROP PRIMARY KEY,
     MODIFY `id` BIGINT NOT NULL AUTO_INCREMENT,
     MODIFY `purchaseId` BIGINT NOT NULL,
     ADD PRIMARY KEY (`id`);
 
 -- AlterTable
-ALTER TABLE `refreshtoken` DROP PRIMARY KEY,
+ALTER TABLE `RefreshToken` DROP PRIMARY KEY,
     MODIFY `id` BIGINT NOT NULL AUTO_INCREMENT,
     MODIFY `userId` INTEGER NOT NULL,
     ADD PRIMARY KEY (`id`);
 
 -- AlterTable
-ALTER TABLE `role` DROP PRIMARY KEY,
+ALTER TABLE `Role` DROP PRIMARY KEY,
     MODIFY `id` INTEGER NOT NULL AUTO_INCREMENT,
     ADD PRIMARY KEY (`id`);
 
 -- AlterTable
-ALTER TABLE `rolepermission` DROP PRIMARY KEY,
+ALTER TABLE `RolePermission` DROP PRIMARY KEY,
     MODIFY `id` INTEGER NOT NULL AUTO_INCREMENT,
     MODIFY `roleId` INTEGER NOT NULL,
     MODIFY `permissionId` INTEGER NOT NULL,
     ADD PRIMARY KEY (`id`);
 
 -- AlterTable
-ALTER TABLE `sale` DROP PRIMARY KEY,
+ALTER TABLE `Sale` DROP PRIMARY KEY,
     MODIFY `id` BIGINT NOT NULL AUTO_INCREMENT,
     MODIFY `branchId` INTEGER NOT NULL,
     MODIFY `warehouseId` INTEGER NOT NULL,
@@ -413,7 +413,7 @@ ALTER TABLE `sale` DROP PRIMARY KEY,
     ADD PRIMARY KEY (`id`);
 
 -- AlterTable
-ALTER TABLE `saleitem` DROP PRIMARY KEY,
+ALTER TABLE `SaleItem` DROP PRIMARY KEY,
     MODIFY `id` BIGINT NOT NULL AUTO_INCREMENT,
     MODIFY `saleId` BIGINT NOT NULL,
     MODIFY `productId` BIGINT NOT NULL,
@@ -421,27 +421,27 @@ ALTER TABLE `saleitem` DROP PRIMARY KEY,
     ADD PRIMARY KEY (`id`);
 
 -- AlterTable
-ALTER TABLE `salepayment` DROP PRIMARY KEY,
+ALTER TABLE `SalePayment` DROP PRIMARY KEY,
     MODIFY `id` BIGINT NOT NULL AUTO_INCREMENT,
     MODIFY `saleId` BIGINT NOT NULL,
     MODIFY `paymentId` BIGINT NOT NULL,
     ADD PRIMARY KEY (`id`);
 
 -- AlterTable
-ALTER TABLE `salereturn` DROP PRIMARY KEY,
+ALTER TABLE `SaleReturn` DROP PRIMARY KEY,
     MODIFY `id` BIGINT NOT NULL AUTO_INCREMENT,
     MODIFY `saleId` BIGINT NOT NULL,
     ADD PRIMARY KEY (`id`);
 
 -- AlterTable
-ALTER TABLE `stockbalance` DROP PRIMARY KEY,
+ALTER TABLE `StockBalance` DROP PRIMARY KEY,
     MODIFY `id` BIGINT NOT NULL AUTO_INCREMENT,
     MODIFY `productId` BIGINT NOT NULL,
     MODIFY `warehouseId` INTEGER NOT NULL,
     ADD PRIMARY KEY (`id`);
 
 -- AlterTable
-ALTER TABLE `stocktransaction` DROP PRIMARY KEY,
+ALTER TABLE `StockTransaction` DROP PRIMARY KEY,
     MODIFY `id` BIGINT NOT NULL AUTO_INCREMENT,
     MODIFY `productId` BIGINT NOT NULL,
     MODIFY `warehouseId` INTEGER NOT NULL,
@@ -449,33 +449,33 @@ ALTER TABLE `stocktransaction` DROP PRIMARY KEY,
     ADD PRIMARY KEY (`id`);
 
 -- AlterTable
-ALTER TABLE `subcategory` DROP PRIMARY KEY,
+ALTER TABLE `SubCategory` DROP PRIMARY KEY,
     MODIFY `id` INTEGER NOT NULL AUTO_INCREMENT,
     MODIFY `categoryId` INTEGER NOT NULL,
     ADD PRIMARY KEY (`id`);
 
 -- AlterTable
-ALTER TABLE `supplier` DROP PRIMARY KEY,
+ALTER TABLE `Supplier` DROP PRIMARY KEY,
     MODIFY `id` INTEGER NOT NULL AUTO_INCREMENT,
     ADD PRIMARY KEY (`id`);
 
 -- AlterTable
-ALTER TABLE `syncqueue` DROP PRIMARY KEY,
+ALTER TABLE `SyncQueue` DROP PRIMARY KEY,
     MODIFY `id` BIGINT NOT NULL AUTO_INCREMENT,
     ADD PRIMARY KEY (`id`);
 
 -- AlterTable
-ALTER TABLE `taxrate` DROP PRIMARY KEY,
+ALTER TABLE `TaxRate` DROP PRIMARY KEY,
     MODIFY `id` INTEGER NOT NULL AUTO_INCREMENT,
     ADD PRIMARY KEY (`id`);
 
 -- AlterTable
-ALTER TABLE `unit` DROP PRIMARY KEY,
+ALTER TABLE `Unit` DROP PRIMARY KEY,
     MODIFY `id` INTEGER NOT NULL AUTO_INCREMENT,
     ADD PRIMARY KEY (`id`);
 
 -- AlterTable
-ALTER TABLE `user` DROP PRIMARY KEY,
+ALTER TABLE `User` DROP PRIMARY KEY,
     MODIFY `id` INTEGER NOT NULL AUTO_INCREMENT,
     MODIFY `companyId` INTEGER NOT NULL,
     MODIFY `branchId` INTEGER NULL,
@@ -483,7 +483,7 @@ ALTER TABLE `user` DROP PRIMARY KEY,
     ADD PRIMARY KEY (`id`);
 
 -- AlterTable
-ALTER TABLE `warehouse` DROP PRIMARY KEY,
+ALTER TABLE `Warehouse` DROP PRIMARY KEY,
     MODIFY `id` INTEGER NOT NULL AUTO_INCREMENT,
     MODIFY `branchId` INTEGER NOT NULL,
     ADD PRIMARY KEY (`id`);
