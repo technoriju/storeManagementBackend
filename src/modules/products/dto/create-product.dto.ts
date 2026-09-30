@@ -110,6 +110,21 @@ export class CreateProductsDto {
   reorderLevel?: number;
 
   @ApiPropertyOptional()
+  @IsNumber()
+  @IsOptional()
+  purchasePrice?: number;
+
+  @ApiPropertyOptional()
+  @IsNumber()
+  @IsOptional()
+  wholesalePrice?: number;
+
+  @ApiPropertyOptional()
+  @IsNumber()
+  @IsOptional()
+  retailPrice?: number;
+
+  @ApiPropertyOptional()
   @IsString()
   @IsOptional()
   status?: string;
