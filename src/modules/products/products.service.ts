@@ -23,7 +23,7 @@ export class ProductsService {
       data.productCode = data.sku;
     }
     if (!data.productCode) {
-      data.productCode = \PROD-\\; // Fallback
+      data.productCode = `PROD-${Date.now()}`; // Fallback
     }
     
     if (data.price !== undefined) data.retailPrice = data.price;
