@@ -28,9 +28,10 @@ export class CreateProductsDto {
   @IsOptional()
   taxRateId?: number;
 
-  @ApiProperty()
+  @ApiPropertyOptional()
   @IsNumber()
-  baseUnitId: number;
+  @IsOptional()
+  baseUnitId?: number;
 
   @ApiPropertyOptional()
   @IsNumber()
@@ -46,9 +47,10 @@ export class CreateProductsDto {
   @IsString()
   name: string;
 
-  @ApiProperty()
+  @ApiPropertyOptional()
   @IsString()
-  productCode: string;
+  @IsOptional()
+  productCode?: string;
 
   @ApiProperty()
   @IsString()
@@ -174,4 +176,17 @@ export class CreateProductsDto {
   @IsOptional()
   @IsString()
   syncStatus?: string;
+
+  @IsOptional()
+  mrp?: any;
+
+  @IsOptional()
+  @IsString()
+  hsn?: string;
+
+  @IsOptional()
+  gst?: any;
+
+  @IsOptional()
+  openingStock?: any;
 }

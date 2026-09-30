@@ -8,27 +8,31 @@ import { UpdateProductsDto } from "./dto/update-product.dto";
 export class ProductsService {
   constructor(private prisma: PrismaService) {}
 
-  private mapMobileDtoToPrisma(dto: any) {
+  private mapMobileDtoToPrisma(dto: any, isUpdate = false) {
     const data = { ...dto };
     
     // Map mobile fields to backend fields
-    if (data.unitId) {
-      data.baseUnitId = data.baseUnitId || data.unitId;
+    if (data.unitId && !data.baseUnitId) {
+      data.baseUnitId = Number(data.unitId);
     }
-    if (!data.baseUnitId) {
+    if (!data.baseUnitId && !isUpdate) {
       data.baseUnitId = 1; // Fallback
+    }
+    if (data.baseUnitId) {
+      data.baseUnitId = Number(data.baseUnitId);
     }
     
     if (!data.productCode && data.sku) {
       data.productCode = data.sku;
     }
-    if (!data.productCode) {
+    if (!data.productCode && !isUpdate) {
       data.productCode = `PROD-${Date.now()}`; // Fallback
     }
     
-    if (data.price !== undefined) data.retailPrice = data.price;
-    if (data.cost !== undefined) data.purchasePrice = data.cost;
-    if (data.lowStockThreshold !== undefined) data.lowStockLevel = data.lowStockThreshold;
+    if (data.price !== undefined && data.retailPrice === undefined) data.retailPrice = data.price;
+    if (data.cost !== undefined && data.purchasePrice === undefined) data.purchasePrice = data.cost;
+    if (data.lowStockThreshold !== undefined && data.lowStockLevel === undefined) data.lowStockLevel = data.lowStockThreshold;
+    if (data.hsn && !data.hsnCode) data.hsnCode = data.hsn;
     
     // Remove offline/unmapped fields so Prisma doesn't crash
     delete data.id;
@@ -52,7 +56,7 @@ export class ProductsService {
   }
 
   async create(createProductsDto: CreateProductsDto) {
-    const data = this.mapMobileDtoToPrisma(createProductsDto);
+    const data = this.mapMobileDtoToPrisma(createProductsDto, false);
     return this.prisma.product.create({ data });
   }
 
@@ -75,7 +79,7 @@ export class ProductsService {
 
   async update(id: any, updateProductsDto: UpdateProductsDto) {
     await this.findOne(id);
-    const data = this.mapMobileDtoToPrisma(updateProductsDto) as Prisma.ProductUncheckedUpdateInput;
+    const data = this.mapMobileDtoToPrisma(updateProductsDto, true) as Prisma.ProductUncheckedUpdateInput;
     return this.prisma.product.update({
       where: { id: BigInt(id) },
       data,
