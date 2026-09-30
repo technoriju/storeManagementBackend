@@ -128,4 +128,50 @@ export class CreateProductsDto {
   @IsString()
   @IsOptional()
   status?: string;
+
+  // Added for mobile sync compatibility
+  @IsOptional()
+  id?: any;
+
+  @IsOptional()
+  @IsNumber()
+  price?: number;
+
+  @IsOptional()
+  @IsNumber()
+  cost?: number;
+
+  @IsOptional()
+  @IsNumber()
+  unitId?: number;
+
+  @IsOptional()
+  @IsNumber()
+  subUnitId?: number;
+
+  @IsOptional()
+  @IsNumber()
+  subunitId?: number;
+
+  @IsOptional()
+  @IsNumber()
+  conversionRate?: number;
+
+  @IsOptional()
+  @IsNumber()
+  stockQuantity?: number;
+
+  @IsOptional()
+  @IsNumber()
+  lowStockThreshold?: number;
+
+  @IsOptional()
+  createdAt?: any;
+
+  @IsOptional()
+  updatedAt?: any;
+
+  @IsOptional()
+  @IsString()
+  syncStatus?: string;
 }

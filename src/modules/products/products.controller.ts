@@ -3,7 +3,7 @@ import {
   Get,
   Post,
   Body,
-  Patch,
+  Put, Patch,
   Param,
   Delete,
   UseGuards,
@@ -40,7 +40,7 @@ export class ProductsController {
   }
 
   @ApiOperation({ summary: "Update a product by id" })
-  @Patch(":id")
+  @Put(":id")
   update(@Param("id") id: any, @Body() updateProductsDto: UpdateProductsDto) {
     return this.productsService.update(id, updateProductsDto);
   }
