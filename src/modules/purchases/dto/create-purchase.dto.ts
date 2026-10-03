@@ -5,8 +5,8 @@ export class PurchaseItemDto {
   @IsNumber()
   productId: any;
 
-  @IsNumber()
-  productUnitId: any;
+  @IsOptional()
+  productUnitId?: any;
 
   @IsNumber()
   quantity: number;

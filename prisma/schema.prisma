@@ -251,6 +251,7 @@ model SubUnit {
   deviceId  String?
 
   parentUnit Unit @relation(fields: [parentUnitId], references: [id])
+  products   Product[]
 
   @@unique([parentUnitId, name])
   @@index([parentUnitId])
@@ -285,6 +286,8 @@ model Product {
   brandId               Int?
   taxRateId             Int?
   baseUnitId            Int
+  subUnitId             Int?
+  conversionRate        Decimal? @db.Decimal(10, 4) @default(1)
   defaultPurchaseUnitId BigInt?
   defaultSalesUnitId    BigInt?
 
@@ -322,6 +325,7 @@ model Product {
   brand       Brand?       @relation(fields: [brandId], references: [id])
   taxRate     TaxRate?     @relation(fields: [taxRateId], references: [id])
   baseUnit    Unit         @relation("ProductBaseUnit", fields: [baseUnitId], references: [id])
+  subUnit     SubUnit?     @relation(fields: [subUnitId], references: [id])
 
   defaultPurchaseUnit ProductUnit? @relation("DefaultPurchaseUnit", fields: [defaultPurchaseUnitId], references: [id])
   defaultSalesUnit    ProductUnit? @relation("DefaultSalesUnit", fields: [defaultSalesUnitId], references: [id])

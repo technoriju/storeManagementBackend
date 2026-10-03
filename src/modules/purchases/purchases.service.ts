@@ -11,59 +11,92 @@ export class PurchasesService {
     const { items, paymentAmount, paymentMethod, ...purchaseData } = createPurchaseDto;
 
     return this.prisma.$transaction(async (tx) => {
-      // 1. Create Purchase
+      // 1. Resolve product units and quantities
+      const resolvedItems: any[] = [];
+      for (const item of items) {
+        const prodId = BigInt(item.productId);
+        const product = await tx.product.findUnique({
+          where: { id: prodId },
+          include: { productUnits: true },
+        });
+        if (!product) throw new NotFoundException(`Product ${item.productId} not found`);
+
+        let puId = item.productUnitId ? BigInt(item.productUnitId) : null;
+        let pu = puId ? await tx.productUnit.findUnique({ where: { id: puId } }) : null;
+
+        if (!pu) {
+          if (product.defaultPurchaseUnitId) {
+            pu = await tx.productUnit.findUnique({ where: { id: product.defaultPurchaseUnitId } });
+          } else if (product.productUnits && product.productUnits.length > 0) {
+            pu = product.productUnits[0];
+          } else {
+            pu = await tx.productUnit.create({
+              data: {
+                productId: product.id,
+                unitId: product.baseUnitId,
+                conversionFactor: 1,
+              },
+            });
+          }
+          puId = pu.id;
+        }
+
+        const conversionFactor = Number(pu.conversionFactor || 1);
+        const baseQuantity = item.quantity * conversionFactor;
+
+        resolvedItems.push({
+          ...item,
+          productId: prodId,
+          productUnitId: puId,
+          unitId: pu.unitId,
+          baseQuantity,
+        });
+      }
+
+      // 2. Create Purchase
       const purchase = await tx.purchase.create({
         data: {
           ...purchaseData,
           purchaseDate: new Date(purchaseData.purchaseDate),
           items: {
-            create: items.map(item => ({
+            create: resolvedItems.map((item) => ({
               productId: item.productId,
               productUnitId: item.productUnitId,
               quantity: item.quantity,
               unitPrice: item.unitPrice,
               discount: item.discount,
               taxAmount: item.taxAmount,
-              total: item.total
-            }))
-          }
+              total: item.total,
+            })),
+          },
         },
-        include: { items: true }
+        include: { items: true },
       });
 
-      // 2. Handle Stock Updates
-      for (const item of items) {
-        const productUnit = await tx.productUnit.findUnique({
-          where: { id: item.productUnitId }
-        });
-        
-        if (!productUnit) throw new NotFoundException(`Product Unit ${item.productUnitId} not found`);
-        
-        const conversionFactor = Number(productUnit.conversionFactor || 1);
-        const baseQuantity = item.quantity * conversionFactor;
-
+      // 3. Handle Stock Updates in Base Unit
+      for (const item of resolvedItems) {
         // Upsert StockBalance
         const existingStock = await tx.stockBalance.findUnique({
           where: {
             productId_warehouseId: {
               productId: item.productId,
               warehouseId: purchaseData.warehouseId,
-            }
-          }
+            },
+          },
         });
 
         if (existingStock) {
           await tx.stockBalance.update({
             where: { id: existingStock.id },
-            data: { quantity: Number(existingStock.quantity) + baseQuantity }
+            data: { quantity: Number(existingStock.quantity) + item.baseQuantity },
           });
         } else {
           await tx.stockBalance.create({
             data: {
               productId: item.productId,
               warehouseId: purchaseData.warehouseId,
-              quantity: baseQuantity,
-            }
+              quantity: item.baseQuantity,
+            },
           });
         }
 
@@ -74,10 +107,10 @@ export class PurchasesService {
             warehouseId: purchaseData.warehouseId,
             transactionType: "PURCHASE",
             referenceId: `PURCHASE-${purchase.id}`,
-            unitId: productUnit.unitId,
+            unitId: item.unitId,
             unitQuantity: item.quantity,
-            baseQuantity: baseQuantity,
-          }
+            baseQuantity: item.baseQuantity,
+          },
         });
       }
 

@@ -21,6 +21,19 @@ export class ProductsService {
     if (data.baseUnitId) {
       data.baseUnitId = Number(data.baseUnitId);
     }
+
+    const subUnitId = data.subUnitId || data.subunitId;
+    if (subUnitId !== undefined && subUnitId !== null && subUnitId !== '') {
+      data.subUnitId = Number(subUnitId);
+    } else if (!isUpdate) {
+      data.subUnitId = null;
+    }
+
+    if (data.conversionRate !== undefined && data.conversionRate !== null && data.conversionRate !== '') {
+      data.conversionRate = Number(data.conversionRate) || 1;
+    } else if (!isUpdate) {
+      data.conversionRate = 1;
+    }
     
     if (!data.productCode && data.sku) {
       data.productCode = data.sku;
@@ -49,9 +62,7 @@ export class ProductsService {
     delete data.price;
     delete data.cost;
     delete data.unitId;
-    delete data.subUnitId;
     delete data.subunitId;
-    delete data.conversionRate;
     delete data.stockQuantity;
     delete data.lowStockThreshold;
     delete data.syncStatus;
@@ -65,15 +76,80 @@ export class ProductsService {
     return data as Prisma.ProductUncheckedCreateInput;
   }
 
+  private async ensureProductUnits(productId: bigint, baseUnitId: number, subUnitId?: number | null, conversionRate?: number | null) {
+    try {
+      // 1. Ensure base unit ProductUnit exists
+      let basePU = await this.prisma.productUnit.findFirst({
+        where: { productId, unitId: baseUnitId, deletedAt: null },
+      });
+      if (!basePU) {
+        basePU = await this.prisma.productUnit.create({
+          data: {
+            productId,
+            unitId: baseUnitId,
+            conversionFactor: 1,
+          },
+        });
+      }
+
+      let subPU = null;
+      if (subUnitId) {
+        const subUnit = await this.prisma.subUnit.findFirst({ where: { id: subUnitId, deletedAt: null } });
+        if (subUnit) {
+          const cFactor = Number(conversionRate || subUnit.multiplier || 1);
+          subPU = await this.prisma.productUnit.findFirst({
+            where: { productId, unitId: subUnit.parentUnitId, id: { not: basePU.id }, deletedAt: null }
+          });
+          if (!subPU) {
+            subPU = await this.prisma.productUnit.create({
+              data: {
+                productId,
+                unitId: subUnit.parentUnitId,
+                conversionFactor: cFactor > 0 ? 1 / cFactor : 1,
+              },
+            });
+          } else {
+            await this.prisma.productUnit.update({
+              where: { id: subPU.id },
+              data: { conversionFactor: cFactor > 0 ? 1 / cFactor : 1 },
+            });
+          }
+        }
+      }
+
+      await this.prisma.product.update({
+        where: { id: productId },
+        data: {
+          defaultPurchaseUnitId: basePU.id,
+          defaultSalesUnitId: subPU ? subPU.id : basePU.id,
+        },
+      });
+    } catch (e) {
+      console.warn("Failed to ensure product units:", e);
+    }
+  }
+
   async create(createProductsDto: CreateProductsDto) {
     const data = this.mapMobileDtoToPrisma(createProductsDto, false);
-    return this.prisma.product.create({ data });
+    const product = await this.prisma.product.create({ data });
+    if (product.baseUnitId) {
+      await this.ensureProductUnits(product.id, product.baseUnitId, product.subUnitId, Number(product.conversionRate || 1));
+    }
+    return this.findOne(product.id);
   }
 
   async findAll() {
     return this.prisma.product.findMany({
       where: { deletedAt: null },
-      orderBy: { id: 'desc' },
+      include: {
+        baseUnit: true,
+        subUnit: true,
+        category: true,
+        subCategory: true,
+        brand: true,
+        productUnits: { include: { unit: true } },
+      },
+      orderBy: { id: "desc" },
     });
   }
 
@@ -86,6 +162,14 @@ export class ProductsService {
     }
     const item = await this.prisma.product.findFirst({
       where: { id: bigId, deletedAt: null },
+      include: {
+        baseUnit: true,
+        subUnit: true,
+        category: true,
+        subCategory: true,
+        brand: true,
+        productUnits: { include: { unit: true } },
+      },
     });
     if (!item) {
       throw new NotFoundException("Products not found");
@@ -96,10 +180,14 @@ export class ProductsService {
   async update(id: any, updateProductsDto: UpdateProductsDto) {
     await this.findOne(id);
     const data = this.mapMobileDtoToPrisma(updateProductsDto, true) as Prisma.ProductUncheckedUpdateInput;
-    return this.prisma.product.update({
+    const product = await this.prisma.product.update({
       where: { id: BigInt(id) },
       data,
     });
+    if (product.baseUnitId) {
+      await this.ensureProductUnits(product.id, product.baseUnitId, product.subUnitId, Number(product.conversionRate || 1));
+    }
+    return this.findOne(product.id);
   }
 
   async remove(id: any) {
