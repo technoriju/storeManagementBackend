@@ -1,12 +1,14 @@
 import { IsString, IsInt, IsOptional, IsDateString, IsNumber, IsArray, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
+import { IsNumericId } from '../../../common/validators/is-numeric-id.validator';
 
 export class SaleItemDto {
-  @IsNumber()
-  productId: any;
+  @IsNumericId()
+  productId: string | number;
 
   @IsOptional()
-  productUnitId?: any;
+  @IsNumericId()
+  productUnitId?: string | number;
 
   @IsNumber()
   quantity: number;

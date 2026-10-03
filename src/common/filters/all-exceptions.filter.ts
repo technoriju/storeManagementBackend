@@ -18,28 +18,56 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const request = ctx.getRequest<Request>();
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
-    let message = "Internal server error";
+    let message: string | string[] = "Internal server error";
+    let errors: any = null;
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
       const exceptionResponse = exception.getResponse();
-      message =
-        typeof exceptionResponse === "string"
-          ? exceptionResponse
-          : (exceptionResponse as any).message || exception.message;
+
+      if (typeof exceptionResponse === "string") {
+        message = exceptionResponse;
+      } else if (typeof exceptionResponse === "object" && exceptionResponse !== null) {
+        const resp = exceptionResponse as any;
+        if (Array.isArray(resp.message)) {
+          // ValidationPipe error array
+          errors = resp.message;
+          message =
+            resp.message.length === 1
+              ? resp.message[0]
+              : resp.error || "Validation failed";
+        } else {
+          message = resp.message || exception.message;
+          if (resp.errors) {
+            errors = resp.errors;
+          }
+        }
+      }
     }
 
-    this.logger.error(`Status: ${status} Error: ${JSON.stringify(message)}`);
-    if (exception instanceof Error) {
-      this.logger.error(exception.stack);
+    if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
+      this.logger.error(`Status: ${status} Error: ${JSON.stringify(message)}`);
+      if (exception instanceof Error) {
+        this.logger.error(exception.stack);
+      }
+    } else {
+      this.logger.warn(
+        `Status: ${status} [${request.method} ${request.url}] Error: ${JSON.stringify(errors || message)}`,
+      );
     }
 
-    response.status(status).json({
+    const responsePayload: Record<string, any> = {
       statusCode: status,
       timestamp: new Date().toISOString(),
       path: request.url,
       message: message,
       data: null,
-    });
+    };
+
+    if (errors) {
+      responsePayload.errors = errors;
+    }
+
+    response.status(status).json(responsePayload);
   }
 }
