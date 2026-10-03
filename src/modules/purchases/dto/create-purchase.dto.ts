@@ -16,25 +16,30 @@ export class PurchaseItemDto {
   @IsNumber()
   unitPrice: number;
 
+  @IsOptional()
   @IsNumber()
-  discount: number;
+  discount?: number;
 
+  @IsOptional()
   @IsNumber()
-  taxAmount: number;
+  taxAmount?: number;
 
   @IsNumber()
   total: number;
 }
 
 export class CreatePurchaseDto {
+  @IsOptional()
   @IsInt()
-  branchId: number;
+  branchId?: number;
 
+  @IsOptional()
   @IsInt()
-  warehouseId: number;
+  warehouseId?: number;
 
+  @IsOptional()
   @IsInt()
-  supplierId: number;
+  supplierId?: number;
 
   @IsString()
   invoiceNumber: string;
@@ -42,8 +47,9 @@ export class CreatePurchaseDto {
   @IsDateString()
   purchaseDate: string;
 
+  @IsOptional()
   @IsString()
-  status: string;
+  status?: string;
 
   @IsNumber()
   subTotal: number;

@@ -11,9 +11,30 @@ export class PurchaseOrdersService {
     const { items, ...poData } = createDto;
 
     return this.prisma.$transaction(async (tx) => {
+      let resolvedSupplierId: number | null = null;
+      if (poData.supplierId) {
+        const supp = await tx.supplier.findUnique({ where: { id: poData.supplierId } });
+        resolvedSupplierId = supp ? supp.id : null;
+      }
+
+      let resolvedBranchId: number | null = null;
+      if (poData.branchId) {
+        const br = await tx.branch.findUnique({ where: { id: poData.branchId } });
+        resolvedBranchId = br ? br.id : null;
+      }
+
+      let resolvedWarehouseId: number | null = null;
+      if (poData.warehouseId) {
+        const wh = await tx.warehouse.findUnique({ where: { id: poData.warehouseId } });
+        resolvedWarehouseId = wh ? wh.id : null;
+      }
+
       const order = await tx.purchaseOrder.create({
         data: {
           ...poData,
+          supplierId: resolvedSupplierId,
+          branchId: resolvedBranchId,
+          warehouseId: resolvedWarehouseId,
           orderDate: new Date(poData.orderDate),
           expectedDate: poData.expectedDate ? new Date(poData.expectedDate) : null,
           items: {

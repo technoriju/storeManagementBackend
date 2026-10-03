@@ -32,8 +32,9 @@ export class CreatePurchaseOrderDto {
   @IsString()
   orderNumber: string;
 
+  @IsOptional()
   @IsInt()
-  supplierId: number;
+  supplierId?: number;
 
   @IsOptional()
   @IsInt()

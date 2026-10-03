@@ -11,9 +11,30 @@ export class QuotationsService {
     const { items, ...quotationData } = createDto;
 
     return this.prisma.$transaction(async (tx) => {
+      let resolvedCustomerId: number | null = null;
+      if (quotationData.customerId) {
+        const cust = await tx.customer.findUnique({ where: { id: quotationData.customerId } });
+        resolvedCustomerId = cust ? cust.id : null;
+      }
+
+      let resolvedBranchId: number | null = null;
+      if (quotationData.branchId) {
+        const br = await tx.branch.findUnique({ where: { id: quotationData.branchId } });
+        resolvedBranchId = br ? br.id : null;
+      }
+
+      let resolvedWarehouseId: number | null = null;
+      if (quotationData.warehouseId) {
+        const wh = await tx.warehouse.findUnique({ where: { id: quotationData.warehouseId } });
+        resolvedWarehouseId = wh ? wh.id : null;
+      }
+
       const quotation = await tx.quotation.create({
         data: {
           ...quotationData,
+          customerId: resolvedCustomerId,
+          branchId: resolvedBranchId,
+          warehouseId: resolvedWarehouseId,
           date: new Date(quotationData.date),
           expiryDate: quotationData.expiryDate ? new Date(quotationData.expiryDate) : null,
           items: {

@@ -53,10 +53,38 @@ export class PurchasesService {
         });
       }
 
-      // 2. Create Purchase
+      // 2. Resolve & validate optional foreign key IDs to prevent FK constraint violations
+      let resolvedWarehouseId: number | null = null;
+      if (purchaseData.warehouseId) {
+        const wh = await tx.warehouse.findUnique({ where: { id: purchaseData.warehouseId } });
+        if (wh) {
+          resolvedWarehouseId = wh.id;
+        } else {
+          const defaultWh = await tx.warehouse.findFirst();
+          resolvedWarehouseId = defaultWh ? defaultWh.id : null;
+        }
+      }
+
+      let resolvedBranchId: number | null = null;
+      if (purchaseData.branchId) {
+        const br = await tx.branch.findUnique({ where: { id: purchaseData.branchId } });
+        resolvedBranchId = br ? br.id : null;
+      }
+
+      let resolvedSupplierId: number | null = null;
+      if (purchaseData.supplierId) {
+        const supp = await tx.supplier.findUnique({ where: { id: purchaseData.supplierId } });
+        resolvedSupplierId = supp ? supp.id : null;
+      }
+
+      // 3. Create Purchase
       const purchase = await tx.purchase.create({
         data: {
           ...purchaseData,
+          branchId: resolvedBranchId,
+          warehouseId: resolvedWarehouseId,
+          supplierId: resolvedSupplierId,
+          status: purchaseData.status || "COMPLETED",
           purchaseDate: new Date(purchaseData.purchaseDate),
           items: {
             create: resolvedItems.map((item) => ({
@@ -64,8 +92,8 @@ export class PurchasesService {
               productUnitId: item.productUnitId,
               quantity: item.quantity,
               unitPrice: item.unitPrice,
-              discount: item.discount,
-              taxAmount: item.taxAmount,
+              discount: item.discount || 0,
+              taxAmount: item.taxAmount || 0,
               total: item.total,
             })),
           },
@@ -73,45 +101,47 @@ export class PurchasesService {
         include: { items: true },
       });
 
-      // 3. Handle Stock Updates in Base Unit
-      for (const item of resolvedItems) {
-        // Upsert StockBalance
-        const existingStock = await tx.stockBalance.findUnique({
-          where: {
-            productId_warehouseId: {
-              productId: item.productId,
-              warehouseId: purchaseData.warehouseId,
+      // 4. Handle Stock Updates in Base Unit (if warehouse resolved)
+      if (resolvedWarehouseId) {
+        for (const item of resolvedItems) {
+          // Upsert StockBalance
+          const existingStock = await tx.stockBalance.findUnique({
+            where: {
+              productId_warehouseId: {
+                productId: item.productId,
+                warehouseId: resolvedWarehouseId,
+              },
             },
-          },
-        });
-
-        if (existingStock) {
-          await tx.stockBalance.update({
-            where: { id: existingStock.id },
-            data: { quantity: Number(existingStock.quantity) + item.baseQuantity },
           });
-        } else {
-          await tx.stockBalance.create({
+
+          if (existingStock) {
+            await tx.stockBalance.update({
+              where: { id: existingStock.id },
+              data: { quantity: Number(existingStock.quantity) + item.baseQuantity },
+            });
+          } else {
+            await tx.stockBalance.create({
+              data: {
+                productId: item.productId,
+                warehouseId: resolvedWarehouseId,
+                quantity: item.baseQuantity,
+              },
+            });
+          }
+
+          // Create StockTransaction
+          await tx.stockTransaction.create({
             data: {
               productId: item.productId,
-              warehouseId: purchaseData.warehouseId,
-              quantity: item.baseQuantity,
+              warehouseId: resolvedWarehouseId,
+              transactionType: "PURCHASE",
+              referenceId: `PURCHASE-${purchase.id}`,
+              unitId: item.unitId,
+              unitQuantity: item.quantity,
+              baseQuantity: item.baseQuantity,
             },
           });
         }
-
-        // Create StockTransaction
-        await tx.stockTransaction.create({
-          data: {
-            productId: item.productId,
-            warehouseId: purchaseData.warehouseId,
-            transactionType: "PURCHASE",
-            referenceId: `PURCHASE-${purchase.id}`,
-            unitId: item.unitId,
-            unitQuantity: item.quantity,
-            baseQuantity: item.baseQuantity,
-          },
-        });
       }
 
       // 3. Handle Payment

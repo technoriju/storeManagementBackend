@@ -76,43 +76,45 @@ export class PurchaseReturnsService {
         include: { items: { include: { product: true } }, purchase: true },
       });
 
-      // 3. Deduct stock from warehouse inventory (returned back to supplier)
-      for (const item of resolvedItems) {
-        const existingStock = await tx.stockBalance.findUnique({
-          where: {
-            productId_warehouseId: {
-              productId: item.productId,
-              warehouseId: purchase.warehouseId,
+      // 3. Deduct stock from warehouse inventory (returned back to supplier if warehouse present)
+      if (purchase.warehouseId) {
+        for (const item of resolvedItems) {
+          const existingStock = await tx.stockBalance.findUnique({
+            where: {
+              productId_warehouseId: {
+                productId: item.productId,
+                warehouseId: purchase.warehouseId,
+              },
             },
-          },
-        });
-
-        if (existingStock) {
-          await tx.stockBalance.update({
-            where: { id: existingStock.id },
-            data: { quantity: Number(existingStock.quantity) - item.baseQuantity },
           });
-        } else {
-          await tx.stockBalance.create({
+
+          if (existingStock) {
+            await tx.stockBalance.update({
+              where: { id: existingStock.id },
+              data: { quantity: Number(existingStock.quantity) - item.baseQuantity },
+            });
+          } else {
+            await tx.stockBalance.create({
+              data: {
+                productId: item.productId,
+                warehouseId: purchase.warehouseId,
+                quantity: -item.baseQuantity,
+              },
+            });
+          }
+
+          await tx.stockTransaction.create({
             data: {
               productId: item.productId,
               warehouseId: purchase.warehouseId,
-              quantity: -item.baseQuantity,
+              transactionType: "PURCHASE_RETURN",
+              referenceId: `PURCHASE-RETURN-${purchaseReturn.id}`,
+              unitId: item.unitId,
+              unitQuantity: -item.quantity,
+              baseQuantity: -item.baseQuantity,
             },
           });
         }
-
-        await tx.stockTransaction.create({
-          data: {
-            productId: item.productId,
-            warehouseId: purchase.warehouseId,
-            transactionType: "PURCHASE_RETURN",
-            referenceId: `PURCHASE-RETURN-${purchaseReturn.id}`,
-            unitId: item.unitId,
-            unitQuantity: -item.quantity,
-            baseQuantity: -item.baseQuantity,
-          },
-        });
       }
 
       return purchaseReturn;

@@ -76,43 +76,45 @@ export class SaleReturnsService {
         include: { items: { include: { product: true } }, sale: true },
       });
 
-      // 3. Restock items into warehouse inventory
-      for (const item of resolvedItems) {
-        const existingStock = await tx.stockBalance.findUnique({
-          where: {
-            productId_warehouseId: {
-              productId: item.productId,
-              warehouseId: sale.warehouseId,
+      // 3. Restock items into warehouse inventory (if warehouse present)
+      if (sale.warehouseId) {
+        for (const item of resolvedItems) {
+          const existingStock = await tx.stockBalance.findUnique({
+            where: {
+              productId_warehouseId: {
+                productId: item.productId,
+                warehouseId: sale.warehouseId,
+              },
             },
-          },
-        });
-
-        if (existingStock) {
-          await tx.stockBalance.update({
-            where: { id: existingStock.id },
-            data: { quantity: Number(existingStock.quantity) + item.baseQuantity },
           });
-        } else {
-          await tx.stockBalance.create({
+
+          if (existingStock) {
+            await tx.stockBalance.update({
+              where: { id: existingStock.id },
+              data: { quantity: Number(existingStock.quantity) + item.baseQuantity },
+            });
+          } else {
+            await tx.stockBalance.create({
+              data: {
+                productId: item.productId,
+                warehouseId: sale.warehouseId,
+                quantity: item.baseQuantity,
+              },
+            });
+          }
+
+          await tx.stockTransaction.create({
             data: {
               productId: item.productId,
               warehouseId: sale.warehouseId,
-              quantity: item.baseQuantity,
+              transactionType: "SALE_RETURN",
+              referenceId: `SALE-RETURN-${saleReturn.id}`,
+              unitId: item.unitId,
+              unitQuantity: item.quantity,
+              baseQuantity: item.baseQuantity,
             },
           });
         }
-
-        await tx.stockTransaction.create({
-          data: {
-            productId: item.productId,
-            warehouseId: sale.warehouseId,
-            transactionType: "SALE_RETURN",
-            referenceId: `SALE-RETURN-${saleReturn.id}`,
-            unitId: item.unitId,
-            unitQuantity: item.quantity,
-            baseQuantity: item.baseQuantity,
-          },
-        });
       }
 
       return saleReturn;

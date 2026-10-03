@@ -16,25 +16,30 @@ export class SaleItemDto {
   @IsNumber()
   unitPrice: number;
 
+  @IsOptional()
   @IsNumber()
-  discount: number;
+  discount?: number;
 
+  @IsOptional()
   @IsNumber()
-  taxAmount: number;
+  taxAmount?: number;
 
   @IsNumber()
   total: number;
 }
 
 export class CreateSaleDto {
+  @IsOptional()
   @IsInt()
-  branchId: number;
+  branchId?: number;
 
+  @IsOptional()
   @IsInt()
-  warehouseId: number;
+  warehouseId?: number;
 
+  @IsOptional()
   @IsInt()
-  customerId: number;
+  customerId?: number;
 
   @IsString()
   invoiceNumber: string;
@@ -42,8 +47,9 @@ export class CreateSaleDto {
   @IsDateString()
   saleDate: string;
 
+  @IsOptional()
   @IsString()
-  status: string;
+  status?: string;
 
   @IsNumber()
   subTotal: number;
