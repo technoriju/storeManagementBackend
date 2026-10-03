@@ -1,14 +1,23 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../../infrastructure/data-access/prisma/prisma.service";
-import { CreatePurchaseDto } from "./dto/create-purchase.dto";
-import { UpdatePurchaseDto } from "./dto/update-purchase.dto";
+import { CreateSaleReturnDto } from "./dto/create-sale-return.dto";
 
 @Injectable()
-export class PurchasesService {
+export class SaleReturnsService {
   constructor(private prisma: PrismaService) {}
 
-  async create(createPurchaseDto: CreatePurchaseDto) {
-    const { items, paymentAmount, paymentMethod, ...purchaseData } = createPurchaseDto;
+  async create(createDto: CreateSaleReturnDto) {
+    const { items, saleId, ...returnData } = createDto;
+    const saleIdBigInt = BigInt(saleId);
+
+    const sale = await this.prisma.sale.findUnique({
+      where: { id: saleIdBigInt },
+    });
+    if (!sale) {
+      throw new NotFoundException(`Sale with id ${saleId} not found`);
+    }
+
+    const returnNumber = returnData.returnNumber || `SRT-${Date.now().toString().slice(-6)}`;
 
     return this.prisma.$transaction(async (tx) => {
       // 1. Resolve product units and quantities
@@ -25,62 +34,55 @@ export class PurchasesService {
         let pu = puId ? await tx.productUnit.findUnique({ where: { id: puId } }) : null;
 
         if (!pu) {
-          if (product.defaultPurchaseUnitId) {
-            pu = await tx.productUnit.findUnique({ where: { id: product.defaultPurchaseUnitId } });
+          if (product.defaultSalesUnitId) {
+            pu = await tx.productUnit.findUnique({ where: { id: product.defaultSalesUnitId } });
           } else if (product.productUnits && product.productUnits.length > 0) {
             pu = product.productUnits[0];
-          } else {
-            pu = await tx.productUnit.create({
-              data: {
-                productId: product.id,
-                unitId: product.baseUnitId,
-                conversionFactor: 1,
-              },
-            });
           }
-          puId = pu.id;
         }
 
-        const conversionFactor = Number(pu.conversionFactor || 1);
+        const conversionFactor = pu ? Number(pu.conversionFactor || 1) : 1;
         const baseQuantity = item.quantity * conversionFactor;
 
         resolvedItems.push({
           ...item,
           productId: prodId,
-          productUnitId: puId,
-          unitId: pu.unitId,
+          productUnitId: pu ? pu.id : null,
+          unitId: product.baseUnitId,
           baseQuantity,
         });
       }
 
-      // 2. Create Purchase
-      const purchase = await tx.purchase.create({
+      // 2. Create SaleReturn
+      const saleReturn = await tx.saleReturn.create({
         data: {
-          ...purchaseData,
-          purchaseDate: new Date(purchaseData.purchaseDate),
+          ...returnData,
+          saleId: saleIdBigInt,
+          returnNumber,
+          returnDate: new Date(returnData.returnDate),
+          status: returnData.status || "Received",
           items: {
             create: resolvedItems.map((item) => ({
               productId: item.productId,
               productUnitId: item.productUnitId,
               quantity: item.quantity,
               unitPrice: item.unitPrice,
-              discount: item.discount,
-              taxAmount: item.taxAmount,
+              taxAmount: item.taxAmount || 0,
+              discount: item.discount || 0,
               total: item.total,
             })),
           },
         },
-        include: { items: true },
+        include: { items: { include: { product: true } }, sale: true },
       });
 
-      // 3. Handle Stock Updates in Base Unit
+      // 3. Restock items into warehouse inventory
       for (const item of resolvedItems) {
-        // Upsert StockBalance
         const existingStock = await tx.stockBalance.findUnique({
           where: {
             productId_warehouseId: {
               productId: item.productId,
-              warehouseId: purchaseData.warehouseId,
+              warehouseId: sale.warehouseId,
             },
           },
         });
@@ -94,19 +96,18 @@ export class PurchasesService {
           await tx.stockBalance.create({
             data: {
               productId: item.productId,
-              warehouseId: purchaseData.warehouseId,
+              warehouseId: sale.warehouseId,
               quantity: item.baseQuantity,
             },
           });
         }
 
-        // Create StockTransaction
         await tx.stockTransaction.create({
           data: {
             productId: item.productId,
-            warehouseId: purchaseData.warehouseId,
-            transactionType: "PURCHASE",
-            referenceId: `PURCHASE-${purchase.id}`,
+            warehouseId: sale.warehouseId,
+            transactionType: "SALE_RETURN",
+            referenceId: `SALE-RETURN-${saleReturn.id}`,
             unitId: item.unitId,
             unitQuantity: item.quantity,
             baseQuantity: item.baseQuantity,
@@ -114,71 +115,38 @@ export class PurchasesService {
         });
       }
 
-      // 3. Handle Payment
-      if (paymentAmount && paymentAmount > 0) {
-        const payment = await tx.payment.create({
-          data: {
-            paymentDate: new Date(),
-            amount: paymentAmount,
-            paymentMethod: paymentMethod || "CASH",
-            referenceNumber: purchase.invoiceNumber
-          }
-        });
-
-        await tx.purchasePayment.create({
-          data: {
-            purchaseId: purchase.id,
-            paymentId: payment.id
-          }
-        });
-      }
-
-      return purchase;
+      return saleReturn;
     });
   }
 
   async findAll() {
-    return this.prisma.purchase.findMany({
+    return this.prisma.saleReturn.findMany({
       where: { deletedAt: null },
       include: {
-        supplier: true,
-        warehouse: true,
-        branch: true,
+        sale: { include: { customer: true } },
         items: { include: { product: true } },
       },
-      orderBy: { id: 'desc' },
+      orderBy: { id: "desc" },
     });
   }
 
-  async findOne(id: any) {
-    const item = await this.prisma.purchase.findFirst({
+  async findOne(id: bigint) {
+    const item = await this.prisma.saleReturn.findFirst({
       where: { id, deletedAt: null },
       include: {
-        supplier: true,
-        warehouse: true,
-        branch: true,
+        sale: { include: { customer: true } },
         items: { include: { product: true } },
-        payments: { include: { payment: true } },
       },
     });
     if (!item) {
-      throw new NotFoundException("Purchase not found");
+      throw new NotFoundException("Sale return not found");
     }
     return item;
   }
 
-  async update(id: any, updatePurchaseDto: UpdatePurchaseDto) {
+  async remove(id: bigint) {
     await this.findOne(id);
-    // Note: Complex update logic (handling stock differences) skipped for terseness unless requested
-    return this.prisma.purchase.update({
-      where: { id },
-      data: updatePurchaseDto as any,
-    });
-  }
-
-  async remove(id: any) {
-    await this.findOne(id);
-    return this.prisma.purchase.update({
+    return this.prisma.saleReturn.update({
       where: { id },
       data: { deletedAt: new Date() },
     });

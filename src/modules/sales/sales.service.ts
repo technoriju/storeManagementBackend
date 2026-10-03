@@ -147,7 +147,12 @@ export class SalesService {
   async findAll() {
     return this.prisma.sale.findMany({
       where: { deletedAt: null },
-      include: { customer: true, warehouse: true, branch: true },
+      include: {
+        customer: true,
+        warehouse: true,
+        branch: true,
+        items: { include: { product: true } },
+      },
       orderBy: { id: 'desc' },
     });
   }
@@ -155,7 +160,13 @@ export class SalesService {
   async findOne(id: any) {
     const item = await this.prisma.sale.findFirst({
       where: { id, deletedAt: null },
-      include: { items: true, customer: true, warehouse: true, branch: true, payments: { include: { payment: true } } },
+      include: {
+        customer: true,
+        warehouse: true,
+        branch: true,
+        items: { include: { product: true } },
+        payments: { include: { payment: true } },
+      },
     });
     if (!item) {
       throw new NotFoundException("Sale not found");
