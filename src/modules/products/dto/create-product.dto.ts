@@ -190,4 +190,33 @@ export class CreateProductsDto {
 
   @IsOptional()
   openingStock?: any;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  categoryName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  brandName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  unit?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  unitName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  baseUnitName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  subunit?: any;
 }

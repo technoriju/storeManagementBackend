@@ -340,26 +340,500 @@ export class ProductsService {
     return this.findOne(product.id);
   }
 
-  async bulkCreate(items: CreateProductsDto[]) {
-    let successCount = 0;
+  async bulkCreate(items: any[]) {
+    return this.bulkImport(items);
+  }
+
+  async bulkImport(rawItems: any[]) {
+    if (!Array.isArray(rawItems) || rawItems.length === 0) {
+      return {
+        success: true,
+        total: 0,
+        createdCount: 0,
+        updatedCount: 0,
+        failCount: 0,
+        errors: [],
+        data: [],
+      };
+    }
+
+    // --- STEP 1: Collect unique Category, Brand, and Unit names ---
+    const categoryNameMap = new Map<string, string>(); // lower -> original
+    const brandNameMap = new Map<string, string>(); // lower -> original
+    const unitNameMap = new Map<string, string>(); // lower -> original
+
+    for (const item of rawItems) {
+      if (!item) continue;
+      const catName = String(
+        item.categoryName ||
+          item.category?.name ||
+          (typeof item.category === "string" ? item.category : "") ||
+          "",
+      ).trim();
+      if (catName && !item.categoryId) {
+        categoryNameMap.set(catName.toLowerCase(), catName);
+      }
+
+      const bName = String(
+        item.brandName ||
+          item.brand?.name ||
+          (typeof item.brand === "string" ? item.brand : "") ||
+          "",
+      ).trim();
+      if (bName && !item.brandId) {
+        brandNameMap.set(bName.toLowerCase(), bName);
+      }
+
+      const uName = String(
+        item.unit ||
+          item.baseUnitName ||
+          item.unitName ||
+          item.baseUnit?.name ||
+          "",
+      ).trim();
+      if (uName && !item.baseUnitId && !item.unitId) {
+        unitNameMap.set(uName.toLowerCase(), uName);
+      }
+    }
+
+    // --- STEP 2: Pre-create / Resolve Categories ---
+    const categoryIdMap = new Map<string, number>(); // lowerName -> id
+    const existingCats = await this.prisma.category.findMany({
+      where: { deletedAt: null },
+    });
+    for (const cat of existingCats) {
+      categoryIdMap.set(cat.name.toLowerCase().trim(), cat.id);
+    }
+    for (const [lowerName, originalName] of categoryNameMap.entries()) {
+      if (!categoryIdMap.has(lowerName)) {
+        try {
+          const createdCat = await this.prisma.category.create({
+            data: { name: originalName, status: "ACTIVE" },
+          });
+          categoryIdMap.set(lowerName, createdCat.id);
+        } catch (_) {
+          const refetchCat = await this.prisma.category.findFirst({
+            where: { name: originalName, deletedAt: null },
+          });
+          if (refetchCat) categoryIdMap.set(lowerName, refetchCat.id);
+        }
+      }
+    }
+
+    // --- STEP 3: Pre-create / Resolve Brands ---
+    const brandIdMap = new Map<string, number>(); // lowerName -> id
+    const existingBrands = await this.prisma.brand.findMany({
+      where: { deletedAt: null },
+    });
+    for (const brand of existingBrands) {
+      brandIdMap.set(brand.name.toLowerCase().trim(), brand.id);
+    }
+    for (const [lowerName, originalName] of brandNameMap.entries()) {
+      if (!brandIdMap.has(lowerName)) {
+        try {
+          const createdBrand = await this.prisma.brand.create({
+            data: { name: originalName, status: "ACTIVE" },
+          });
+          brandIdMap.set(lowerName, createdBrand.id);
+        } catch (_) {
+          const refetchBrand = await this.prisma.brand.findFirst({
+            where: { name: originalName, deletedAt: null },
+          });
+          if (refetchBrand) brandIdMap.set(lowerName, refetchBrand.id);
+        }
+      }
+    }
+
+    // --- STEP 4: Pre-create / Resolve Units ---
+    const unitIdMap = new Map<string, number>(); // lowerName -> id
+    const existingUnits = await this.prisma.unit.findMany({
+      where: { deletedAt: null },
+    });
+    for (const unit of existingUnits) {
+      unitIdMap.set(unit.name.toLowerCase().trim(), unit.id);
+      if (unit.shortName) {
+        unitIdMap.set(unit.shortName.toLowerCase().trim(), unit.id);
+      }
+    }
+    for (const [lowerName, originalName] of unitNameMap.entries()) {
+      if (!unitIdMap.has(lowerName)) {
+        try {
+          const shortName =
+            originalName.length <= 10
+              ? originalName.toLowerCase()
+              : originalName.substring(0, 10).toLowerCase();
+          const createdUnit = await this.prisma.unit.create({
+            data: { name: originalName, shortName, status: "ACTIVE" },
+          });
+          unitIdMap.set(lowerName, createdUnit.id);
+          unitIdMap.set(shortName.toLowerCase(), createdUnit.id);
+        } catch (_) {
+          const refetchUnit = await this.prisma.unit.findFirst({
+            where: { name: originalName, deletedAt: null },
+          });
+          if (refetchUnit) unitIdMap.set(lowerName, refetchUnit.id);
+        }
+      }
+    }
+
+    let defaultUnitId: number;
+    if (existingUnits.length > 0) {
+      defaultUnitId = existingUnits[0].id;
+    } else {
+      const defUnit = await this.prisma.unit.create({
+        data: { name: "Piece", shortName: "pcs", status: "ACTIVE" },
+      });
+      defaultUnitId = defUnit.id;
+    }
+
+    // Default warehouse for stock balance updates
+    let defaultWarehouse = await this.prisma.warehouse.findFirst({
+      where: { deletedAt: null },
+    });
+    if (!defaultWarehouse) {
+      let branch =
+        (await this.prisma.branch.findFirst({ where: { deletedAt: null } })) ||
+        (await this.prisma.branch.findFirst());
+      if (!branch) {
+        let company = await this.prisma.company.findFirst({
+          where: { deletedAt: null },
+        });
+        if (!company) {
+          company = await this.prisma.company.create({
+            data: { name: "Main Company", status: "ACTIVE" },
+          });
+        }
+        branch = await this.prisma.branch.create({
+          data: { name: "Main Branch", companyId: company.id, status: "ACTIVE" },
+        });
+      }
+      defaultWarehouse = await this.prisma.warehouse.create({
+        data: { name: "Default Warehouse", branchId: branch.id, status: "ACTIVE" },
+      });
+    }
+
+    // Tax rate cache
+    const taxRateCache = new Map<number, number>();
+    const existingTaxRates = await this.prisma.taxRate.findMany({
+      where: { deletedAt: null },
+    });
+    for (const tr of existingTaxRates) {
+      const full = Number(tr.cgstRate || 0) + Number(tr.sgstRate || 0);
+      taxRateCache.set(Math.round(full * 100) / 100, tr.id);
+      if (tr.igstRate) {
+        taxRateCache.set(Math.round(Number(tr.igstRate) * 100) / 100, tr.id);
+      }
+    }
+
+    // --- STEP 5: Process each product row ---
+    let createdCount = 0;
+    let updatedCount = 0;
     let failCount = 0;
     const errors: string[] = [];
     const results: any[] = [];
 
-    for (let i = 0; i < items.length; i++) {
+    const toNum = (val: any, defaultVal = 0): number => {
+      if (val === undefined || val === null || val === "") return defaultVal;
+      const n = Number(String(val).replace(/[^0-9.-]/g, ""));
+      return isNaN(n) ? defaultVal : n;
+    };
+
+    const toStrOrNull = (val: any): string | null => {
+      if (val === undefined || val === null) return null;
+      const s = String(val).trim();
+      return s.length > 0 && s.toLowerCase() !== "null" ? s : null;
+    };
+
+    for (let i = 0; i < rawItems.length; i++) {
+      const item = rawItems[i];
+      const rowIdx = i + 1;
       try {
-        const prod = await this.create(items[i]);
-        results.push(prod);
-        successCount++;
-      } catch (err: any) {
+        const name = toStrOrNull(item.name);
+        if (!name) {
+          failCount++;
+          errors.push(`Row ${rowIdx}: Product name is required`);
+          continue;
+        }
+
+        let sku = toStrOrNull(item.sku);
+        let productCode = toStrOrNull(item.productCode || item.code);
+        if (!sku && !productCode) {
+          const gen = `PRD-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
+          sku = gen;
+          productCode = gen;
+        } else if (!sku) {
+          sku = productCode!;
+        } else if (!productCode) {
+          productCode = sku!;
+        }
+
+        // Category resolution
+        let categoryId: number | null = null;
+        if (item.categoryId && Number(item.categoryId) > 0) {
+          categoryId = Number(item.categoryId);
+        } else {
+          const catName = String(
+            item.categoryName ||
+              item.category?.name ||
+              (typeof item.category === "string" ? item.category : "") ||
+              "",
+          )
+            .trim()
+            .toLowerCase();
+          if (catName && categoryIdMap.has(catName)) {
+            categoryId = categoryIdMap.get(catName)!;
+          }
+        }
+
+        // Brand resolution
+        let brandId: number | null = null;
+        if (item.brandId && Number(item.brandId) > 0) {
+          brandId = Number(item.brandId);
+        } else {
+          const bName = String(
+            item.brandName ||
+              item.brand?.name ||
+              (typeof item.brand === "string" ? item.brand : "") ||
+              "",
+          )
+            .trim()
+            .toLowerCase();
+          if (bName && brandIdMap.has(bName)) {
+            brandId = brandIdMap.get(bName)!;
+          }
+        }
+
+        // Unit resolution
+        let baseUnitId: number = defaultUnitId;
+        const rawUnitId = item.baseUnitId || item.unitId;
+        if (rawUnitId && Number(rawUnitId) > 0) {
+          baseUnitId = Number(rawUnitId);
+        } else {
+          const uName = String(
+            item.unit ||
+              item.baseUnitName ||
+              item.unitName ||
+              item.baseUnit?.name ||
+              "",
+          )
+            .trim()
+            .toLowerCase();
+          if (uName && unitIdMap.has(uName)) {
+            baseUnitId = unitIdMap.get(uName)!;
+          }
+        }
+
+        // Subunit & conversionRate
+        let subUnitId: number | null = null;
+        const rawSubUnitId = item.subUnitId || item.subunitId;
+        if (rawSubUnitId && Number(rawSubUnitId) > 0) {
+          subUnitId = Number(rawSubUnitId);
+        }
+        let conversionRate = toNum(item.conversionRate, 0);
+        if (conversionRate <= 0) {
+          const rawSub = toNum(item.subunit || item.subUnit, 0);
+          conversionRate = rawSub > 0 ? rawSub : 1;
+        }
+
+        // Tax Rate resolution
+        let taxRateId: number | null = null;
+        if (item.taxRateId && Number(item.taxRateId) > 0) {
+          taxRateId = Number(item.taxRateId);
+        } else {
+          const gstVal = toNum(item.gst || item.taxRate, 0);
+          if (gstVal > 0) {
+            const rounded = Math.round(gstVal * 100) / 100;
+            if (taxRateCache.has(rounded)) {
+              taxRateId = taxRateCache.get(rounded)!;
+            } else {
+              const half = rounded / 2;
+              try {
+                const newTaxRate = await this.prisma.taxRate.create({
+                  data: {
+                    name: `GST ${rounded}%`,
+                    cgstRate: half,
+                    sgstRate: half,
+                    igstRate: rounded,
+                    status: "ACTIVE",
+                  },
+                });
+                taxRateCache.set(rounded, newTaxRate.id);
+                taxRateId = newTaxRate.id;
+              } catch (_) {}
+            }
+          }
+        }
+
+        // Numbers default to 0
+        const purchasePrice = toNum(item.purchasePrice ?? item.cost, 0);
+        const wholesalePrice = toNum(item.wholesalePrice, 0);
+        const retailPrice = toNum(item.retailPrice ?? item.price, 0);
+        const openingStock = toNum(
+          item.openingStock ?? item.stockQuantity ?? item.stock,
+          0,
+        );
+        const lowStockLevel = toNum(
+          item.lowStockLevel ?? item.lowStockThreshold,
+          0,
+        );
+        const reorderLevel = toNum(item.reorderLevel, 0);
+
+        // Strings: blank -> null
+        const barcode = toStrOrNull(item.barcode);
+        const hsnCode = toStrOrNull(item.hsnCode ?? item.hsn);
+        const description = toStrOrNull(item.description);
+        const taxType = item.taxType === "NON_GST" ? "NON_GST" : "GST";
+        const isActive = item.isActive !== false;
+        const isPriceInclusive = item.isPriceInclusive === true;
+
+        // Check if product exists by SKU or Product Code
+        const existing = await this.prisma.product.findFirst({
+          where: {
+            OR: [{ sku }, { productCode }],
+            deletedAt: null,
+          },
+        });
+
+        let savedProduct: any;
+
+        if (existing) {
+          savedProduct = await this.prisma.product.update({
+            where: { id: existing.id },
+            data: {
+              name,
+              sku,
+              productCode,
+              barcode: barcode || existing.barcode,
+              categoryId: categoryId !== null ? categoryId : existing.categoryId,
+              brandId: brandId !== null ? brandId : existing.brandId,
+              baseUnitId,
+              subUnitId: subUnitId !== null ? subUnitId : existing.subUnitId,
+              conversionRate,
+              taxRateId: taxRateId !== null ? taxRateId : existing.taxRateId,
+              taxType,
+              purchasePrice,
+              wholesalePrice,
+              retailPrice,
+              lowStockLevel,
+              reorderLevel,
+              hsnCode: hsnCode || existing.hsnCode,
+              description: description || existing.description,
+              isActive,
+              isPriceInclusive,
+            },
+          });
+          updatedCount++;
+        } else {
+          savedProduct = await this.prisma.product.create({
+            data: {
+              name,
+              sku,
+              productCode,
+              barcode,
+              categoryId,
+              brandId,
+              baseUnitId,
+              subUnitId,
+              conversionRate,
+              taxRateId,
+              taxType,
+              purchasePrice,
+              wholesalePrice,
+              retailPrice,
+              lowStockLevel,
+              reorderLevel,
+              hsnCode,
+              description,
+              isActive,
+              isPriceInclusive,
+              status: "ACTIVE",
+            },
+          });
+          createdCount++;
+        }
+
+        // Ensure ProductUnit entries
+        if (savedProduct.baseUnitId) {
+          await this.ensureProductUnits(
+            savedProduct.id,
+            savedProduct.baseUnitId,
+            savedProduct.subUnitId,
+            Number(savedProduct.conversionRate || 1),
+          );
+        }
+
+        // Opening stock handling
+        if (openingStock > 0 && defaultWarehouse) {
+          try {
+            const existingBalance = await this.prisma.stockBalance.findFirst({
+              where: {
+                productId: savedProduct.id,
+                warehouseId: defaultWarehouse.id,
+                deletedAt: null,
+              },
+            });
+            if (existingBalance) {
+              await this.prisma.stockBalance.update({
+                where: { id: existingBalance.id },
+                data: { quantity: openingStock },
+              });
+            } else {
+              await this.prisma.stockBalance.create({
+                data: {
+                  productId: savedProduct.id,
+                  warehouseId: defaultWarehouse.id,
+                  quantity: openingStock,
+                },
+              });
+            }
+
+            await this.prisma.stockTransaction.create({
+              data: {
+                productId: savedProduct.id,
+                warehouseId: defaultWarehouse.id,
+                transactionType: "OPENING_STOCK",
+                referenceId: `OPENING-${savedProduct.id}-${Date.now()}`,
+                unitId: savedProduct.baseUnitId || undefined,
+                unitQuantity: openingStock,
+                baseQuantity: openingStock,
+              },
+            });
+          } catch (stkErr) {
+            console.warn(`Stock balance warning for row ${rowIdx}:`, stkErr);
+          }
+        }
+
+        results.push({
+          id: savedProduct.id.toString(),
+          name: savedProduct.name,
+          sku: savedProduct.sku,
+          productCode: savedProduct.productCode,
+          purchasePrice,
+          wholesalePrice,
+          retailPrice,
+          stockQuantity: openingStock,
+          categoryId: savedProduct.categoryId,
+          categoryName: item.categoryName || null,
+          brandId: savedProduct.brandId,
+          brandName: item.brandName || null,
+          baseUnitId: savedProduct.baseUnitId,
+          unitName: item.unitName || item.unit || "Piece",
+          conversionRate,
+          barcode,
+          hsnCode,
+          description,
+        });
+      } catch (rowErr: any) {
         failCount++;
-        errors.push(`Row ${i + 1} (${items[i]?.name || 'Unknown'}): ${err.message}`);
+        errors.push(`Row ${rowIdx} (${item?.name || "Unknown"}): ${rowErr.message}`);
       }
     }
 
     return {
-      total: items.length,
-      successCount,
+      success: failCount === 0,
+      total: rawItems.length,
+      createdCount,
+      updatedCount,
       failCount,
       errors,
       data: results,

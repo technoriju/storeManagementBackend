@@ -27,10 +27,43 @@ export class ProductsController {
     return this.productsService.create(createProductsDto);
   }
 
+  @ApiOperation({ summary: "Bulk import products (auto-creates category/brand/unit, handles blanks)" })
+  @Post("bulk-import")
+  bulkImport(@Body() body: any) {
+    const items = Array.isArray(body)
+      ? body
+      : body?.items && Array.isArray(body.items)
+      ? body.items
+      : body?.products && Array.isArray(body.products)
+      ? body.products
+      : [body];
+    return this.productsService.bulkImport(items);
+  }
+
+  @ApiOperation({ summary: "Bulk import products alias" })
+  @Post("import")
+  importProducts(@Body() body: any) {
+    const items = Array.isArray(body)
+      ? body
+      : body?.items && Array.isArray(body.items)
+      ? body.items
+      : body?.products && Array.isArray(body.products)
+      ? body.products
+      : [body];
+    return this.productsService.bulkImport(items);
+  }
+
   @ApiOperation({ summary: "Bulk import/create products" })
   @Post("bulk")
-  bulkCreate(@Body() items: CreateProductsDto[]) {
-    return this.productsService.bulkCreate(items);
+  bulkCreate(@Body() body: any) {
+    const items = Array.isArray(body)
+      ? body
+      : body?.items && Array.isArray(body.items)
+      ? body.items
+      : body?.products && Array.isArray(body.products)
+      ? body.products
+      : [body];
+    return this.productsService.bulkImport(items);
   }
 
   @ApiOperation({ summary: "Get all products" })
