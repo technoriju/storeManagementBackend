@@ -27,6 +27,12 @@ export class ProductsController {
     return this.productsService.create(createProductsDto);
   }
 
+  @ApiOperation({ summary: "Bulk import/create products" })
+  @Post("bulk")
+  bulkCreate(@Body() items: CreateProductsDto[]) {
+    return this.productsService.bulkCreate(items);
+  }
+
   @ApiOperation({ summary: "Get all products" })
   @Get()
   findAll() {

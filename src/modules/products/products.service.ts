@@ -8,6 +8,94 @@ import { UpdateProductsDto } from "./dto/update-product.dto";
 export class ProductsService {
   constructor(private prisma: PrismaService) {}
 
+  private async resolveRelations(dto: any) {
+    // 1. Resolve Category
+    let categoryId = dto.categoryId !== undefined && dto.categoryId !== null ? Number(dto.categoryId) : null;
+    if (categoryId !== null && categoryId <= 0) categoryId = null;
+
+    const catName = String(dto.categoryName || dto.category?.name || (typeof dto.category === 'string' ? dto.category : '') || '').trim();
+    if (!categoryId && catName) {
+      let cat = await this.prisma.category.findFirst({
+        where: { name: catName, deletedAt: null },
+      });
+      if (!cat) {
+        cat = await this.prisma.category.create({
+          data: { name: catName, status: "ACTIVE" },
+        });
+      }
+      categoryId = cat.id;
+    }
+
+    // 2. Resolve Brand
+    let brandId = dto.brandId !== undefined && dto.brandId !== null ? Number(dto.brandId) : null;
+    if (brandId !== null && brandId <= 0) brandId = null;
+
+    const bName = String(dto.brandName || dto.brand?.name || (typeof dto.brand === 'string' ? dto.brand : '') || '').trim();
+    if (!brandId && bName) {
+      let b = await this.prisma.brand.findFirst({
+        where: { name: bName, deletedAt: null },
+      });
+      if (!b) {
+        b = await this.prisma.brand.create({
+          data: { name: bName, status: "ACTIVE" },
+        });
+      }
+      brandId = b.id;
+    }
+
+    // 3. Resolve Unit
+    let baseUnitId = dto.baseUnitId || dto.unitId;
+    baseUnitId = baseUnitId !== undefined && baseUnitId !== null ? Number(baseUnitId) : null;
+    if (baseUnitId !== null && baseUnitId <= 0) baseUnitId = null;
+
+    const uName = String(dto.unit || dto.baseUnitName || dto.unitName || dto.baseUnit?.name || '').trim();
+    if (!baseUnitId && uName) {
+      let u = await this.prisma.unit.findFirst({
+        where: {
+          OR: [
+            { name: uName },
+            { shortName: uName },
+          ],
+          deletedAt: null,
+        },
+      });
+      if (!u) {
+        u = await this.prisma.unit.create({
+          data: {
+            name: uName,
+            shortName: uName.length <= 10 ? uName.toLowerCase() : uName.substring(0, 10).toLowerCase(),
+            status: "ACTIVE",
+          },
+        });
+      }
+      baseUnitId = u.id;
+    }
+
+    if (!baseUnitId) {
+      let defaultUnit = await this.prisma.unit.findFirst({ where: { deletedAt: null } });
+      if (!defaultUnit) {
+        defaultUnit = await this.prisma.unit.create({
+          data: { name: "Piece", shortName: "pcs", status: "ACTIVE" },
+        });
+      }
+      baseUnitId = defaultUnit.id;
+    }
+
+    // 4. Resolve Subunit conversion multiplier
+    let conversionRate = Number(dto.conversionRate);
+    if (!conversionRate || isNaN(conversionRate) || conversionRate <= 0) {
+      const rawSub = Number(dto.subunit || dto.subUnit || dto.subunitId || dto.subUnitId);
+      conversionRate = !isNaN(rawSub) && rawSub > 0 ? rawSub : 1;
+    }
+
+    return {
+      categoryId,
+      brandId,
+      baseUnitId,
+      conversionRate,
+    };
+  }
+
   private mapMobileDtoToPrisma(dto: any, isUpdate = false) {
     const data = { ...dto };
     
@@ -23,7 +111,7 @@ export class ProductsService {
     }
 
     const subUnitId = data.subUnitId || data.subunitId;
-    if (subUnitId !== undefined && subUnitId !== null && subUnitId !== '') {
+    if (subUnitId !== undefined && subUnitId !== null && subUnitId !== '' && Number(subUnitId) > 0) {
       data.subUnitId = Number(subUnitId);
     } else if (!isUpdate) {
       data.subUnitId = null;
@@ -36,35 +124,50 @@ export class ProductsService {
     }
     
     if (!data.productCode && data.sku) {
-      data.productCode = data.sku;
+      data.productCode = String(data.sku).trim();
+    }
+    if (!data.sku && data.productCode) {
+      data.sku = String(data.productCode).trim();
     }
     if (!data.productCode && !isUpdate) {
-      data.productCode = `PROD-${Date.now()}`; // Fallback
+      const genCode = `PROD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      data.productCode = genCode;
+      data.sku = genCode;
     }
     
     if (data.price !== undefined && data.retailPrice === undefined) data.retailPrice = data.price;
     if (data.cost !== undefined && data.purchasePrice === undefined) data.purchasePrice = data.cost;
-    if (data.purchasePrice !== undefined && data.purchasePrice !== null && data.purchasePrice !== '') {
-      data.purchasePrice = Number(data.purchasePrice);
+    
+    // Numeric defaults: blank -> 0
+    data.purchasePrice = (data.purchasePrice !== undefined && data.purchasePrice !== null && data.purchasePrice !== '' && !isNaN(Number(data.purchasePrice))) 
+      ? Number(data.purchasePrice) 
+      : 0;
+    data.wholesalePrice = (data.wholesalePrice !== undefined && data.wholesalePrice !== null && data.wholesalePrice !== '' && !isNaN(Number(data.wholesalePrice))) 
+      ? Number(data.wholesalePrice) 
+      : 0;
+    data.retailPrice = (data.retailPrice !== undefined && data.retailPrice !== null && data.retailPrice !== '' && !isNaN(Number(data.retailPrice))) 
+      ? Number(data.retailPrice) 
+      : 0;
+    
+    if (data.lowStockThreshold !== undefined && data.lowStockLevel === undefined) {
+      data.lowStockLevel = Number(data.lowStockThreshold) || 0;
     }
-    if (data.wholesalePrice !== undefined && data.wholesalePrice !== null && data.wholesalePrice !== '') {
-      data.wholesalePrice = Number(data.wholesalePrice);
-    }
-    if (data.retailPrice !== undefined && data.retailPrice !== null && data.retailPrice !== '') {
-      data.retailPrice = Number(data.retailPrice);
-    }
-    if (data.lowStockThreshold !== undefined && data.lowStockLevel === undefined) data.lowStockLevel = data.lowStockThreshold;
-    if (data.hsn && !data.hsnCode) data.hsnCode = data.hsn;
+    if (data.hsn && !data.hsnCode) data.hsnCode = String(data.hsn).trim();
     
     if (data.categoryId !== undefined) {
-      data.categoryId = data.categoryId ? Number(data.categoryId) : null;
+      data.categoryId = (data.categoryId && Number(data.categoryId) > 0) ? Number(data.categoryId) : null;
     }
     if (data.subCategoryId !== undefined) {
-      data.subCategoryId = data.subCategoryId ? Number(data.subCategoryId) : null;
+      data.subCategoryId = (data.subCategoryId && Number(data.subCategoryId) > 0) ? Number(data.subCategoryId) : null;
     }
     if (data.brandId !== undefined) {
-      data.brandId = data.brandId ? Number(data.brandId) : null;
+      data.brandId = (data.brandId && Number(data.brandId) > 0) ? Number(data.brandId) : null;
     }
+
+    // String fields: blank -> null
+    data.barcode = data.barcode && String(data.barcode).trim() ? String(data.barcode).trim() : null;
+    data.hsnCode = data.hsnCode && String(data.hsnCode).trim() ? String(data.hsnCode).trim() : null;
+    data.description = data.description && String(data.description).trim() ? String(data.description).trim() : null;
     
     // Remove offline/unmapped fields so Prisma doesn't crash
     delete data.id;
@@ -72,6 +175,7 @@ export class ProductsService {
     delete data.cost;
     delete data.unitId;
     delete data.subunitId;
+    delete data.subunit;
     delete data.stockQuantity;
     delete data.lowStockThreshold;
     delete data.syncStatus;
@@ -96,7 +200,7 @@ export class ProductsService {
     try {
       // 1. Ensure base unit ProductUnit exists
       let basePU = await this.prisma.productUnit.findFirst({
-        where: { productId, unitId: baseUnitId, deletedAt: null },
+        where: { productId, unitId: baseUnitId },
       });
       if (!basePU) {
         basePU = await this.prisma.productUnit.create({
@@ -106,6 +210,11 @@ export class ProductsService {
             conversionFactor: 1,
           },
         });
+      } else if (basePU.deletedAt) {
+        basePU = await this.prisma.productUnit.update({
+          where: { id: basePU.id },
+          data: { deletedAt: null, conversionFactor: 1 },
+        });
       }
 
       let subPU = null;
@@ -113,22 +222,51 @@ export class ProductsService {
         const subUnit = await this.prisma.subUnit.findFirst({ where: { id: subUnitId, deletedAt: null } });
         if (subUnit) {
           const cFactor = Number(conversionRate || subUnit.multiplier || 1);
-          subPU = await this.prisma.productUnit.findFirst({
-            where: { productId, unitId: subUnit.parentUnitId, id: { not: basePU.id }, deletedAt: null }
+          let targetUnit = await this.prisma.unit.findFirst({
+            where: {
+              OR: [
+                { name: subUnit.name },
+                { shortName: subUnit.name },
+              ],
+            },
           });
-          if (!subPU) {
-            subPU = await this.prisma.productUnit.create({
+          if (!targetUnit) {
+            targetUnit = await this.prisma.unit.create({
               data: {
-                productId,
-                unitId: subUnit.parentUnitId,
-                conversionFactor: cFactor > 0 ? 1 / cFactor : 1,
+                name: subUnit.name,
+                shortName: subUnit.name.length <= 10 ? subUnit.name.toLowerCase() : subUnit.name.substring(0, 10).toLowerCase(),
               },
             });
-          } else {
-            await this.prisma.productUnit.update({
-              where: { id: subPU.id },
-              data: { conversionFactor: cFactor > 0 ? 1 / cFactor : 1 },
+          } else if (targetUnit.deletedAt) {
+            targetUnit = await this.prisma.unit.update({
+              where: { id: targetUnit.id },
+              data: { deletedAt: null },
             });
+          }
+
+          if (targetUnit.id !== baseUnitId) {
+            subPU = await this.prisma.productUnit.findFirst({
+              where: { productId, unitId: targetUnit.id },
+            });
+            if (!subPU) {
+              subPU = await this.prisma.productUnit.create({
+                data: {
+                  productId,
+                  unitId: targetUnit.id,
+                  conversionFactor: cFactor > 0 ? 1 / cFactor : 1,
+                },
+              });
+            } else {
+              subPU = await this.prisma.productUnit.update({
+                where: { id: subPU.id },
+                data: {
+                  deletedAt: null,
+                  conversionFactor: cFactor > 0 ? 1 / cFactor : 1,
+                },
+              });
+            }
+          } else {
+            subPU = basePU;
           }
         }
       }
@@ -146,9 +284,17 @@ export class ProductsService {
   }
 
   async create(createProductsDto: CreateProductsDto) {
-    const rawStock = (createProductsDto as any).openingStock ?? (createProductsDto as any).stockQuantity ?? (createProductsDto as any).stock;
+    const relations = await this.resolveRelations(createProductsDto);
+    const dtoWithRelations = {
+      ...createProductsDto,
+      categoryId: relations.categoryId,
+      brandId: relations.brandId,
+      baseUnitId: relations.baseUnitId,
+      conversionRate: relations.conversionRate,
+    };
+    const rawStock = (dtoWithRelations as any).openingStock ?? (dtoWithRelations as any).stockQuantity ?? (dtoWithRelations as any).stock;
     const initialQty = rawStock !== undefined && rawStock !== null && !isNaN(Number(rawStock)) ? Number(rawStock) : 0;
-    const data = this.mapMobileDtoToPrisma(createProductsDto, false);
+    const data = this.mapMobileDtoToPrisma(dtoWithRelations, false);
     const product = await this.prisma.product.create({ data });
     if (product.baseUnitId) {
       await this.ensureProductUnits(product.id, product.baseUnitId, product.subUnitId, Number(product.conversionRate || 1));
@@ -192,6 +338,32 @@ export class ProductsService {
       }
     }
     return this.findOne(product.id);
+  }
+
+  async bulkCreate(items: CreateProductsDto[]) {
+    let successCount = 0;
+    let failCount = 0;
+    const errors: string[] = [];
+    const results: any[] = [];
+
+    for (let i = 0; i < items.length; i++) {
+      try {
+        const prod = await this.create(items[i]);
+        results.push(prod);
+        successCount++;
+      } catch (err: any) {
+        failCount++;
+        errors.push(`Row ${i + 1} (${items[i]?.name || 'Unknown'}): ${err.message}`);
+      }
+    }
+
+    return {
+      total: items.length,
+      successCount,
+      failCount,
+      errors,
+      data: results,
+    };
   }
 
   async findAll() {
