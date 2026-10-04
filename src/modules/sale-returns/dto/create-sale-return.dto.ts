@@ -2,7 +2,7 @@ import { IsString, IsInt, IsOptional, IsDateString, IsNumber, IsArray, ValidateN
 import { Type } from 'class-transformer';
 import { IsNumericId } from '../../../common/validators/is-numeric-id.validator';
 
-export class PurchaseItemDto {
+export class SaleReturnItemDto {
   @IsNumericId()
   productId: string | number;
 
@@ -28,51 +28,42 @@ export class PurchaseItemDto {
   total: number;
 }
 
-export class CreatePurchaseDto {
-  @IsOptional()
-  @IsInt()
-  branchId?: number;
+export class CreateSaleReturnDto {
+  @IsNumericId()
+  saleId: string | number;
 
   @IsOptional()
-  @IsInt()
-  warehouseId?: number;
-
-  @IsOptional()
-  @IsInt()
-  supplierId?: number;
-
   @IsString()
-  invoiceNumber: string;
+  returnNumber?: string;
 
   @IsDateString()
-  purchaseDate: string;
+  returnDate: string;
+
+  @IsOptional()
+  @IsString()
+  reason?: string;
+
+  @IsOptional()
+  @IsNumber()
+  subTotal?: number;
+
+  @IsOptional()
+  @IsNumber()
+  taxTotal?: number;
+
+  @IsOptional()
+  @IsNumber()
+  discountTotal?: number;
+
+  @IsNumber()
+  totalAmount: number;
 
   @IsOptional()
   @IsString()
   status?: string;
 
-  @IsNumber()
-  subTotal: number;
-
-  @IsNumber()
-  taxTotal: number;
-
-  @IsNumber()
-  discountTotal: number;
-
-  @IsNumber()
-  grandTotal: number;
-
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => PurchaseItemDto)
-  items: PurchaseItemDto[];
-
-  @IsOptional()
-  @IsNumber()
-  paymentAmount?: number;
-
-  @IsOptional()
-  @IsString()
-  paymentMethod?: string;
+  @Type(() => SaleReturnItemDto)
+  items: SaleReturnItemDto[];
 }

@@ -1,12 +1,14 @@
 import { IsString, IsInt, IsOptional, IsDateString, IsNumber, IsArray, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
+import { IsNumericId } from '../../../common/validators/is-numeric-id.validator';
 
 export class SaleItemDto {
-  @IsNumber()
-  productId: any;
+  @IsNumericId()
+  productId: string | number;
 
-  @IsNumber()
-  productUnitId: any;
+  @IsOptional()
+  @IsNumericId()
+  productUnitId?: string | number;
 
   @IsNumber()
   quantity: number;
@@ -14,25 +16,30 @@ export class SaleItemDto {
   @IsNumber()
   unitPrice: number;
 
+  @IsOptional()
   @IsNumber()
-  discount: number;
+  discount?: number;
 
+  @IsOptional()
   @IsNumber()
-  taxAmount: number;
+  taxAmount?: number;
 
   @IsNumber()
   total: number;
 }
 
 export class CreateSaleDto {
+  @IsOptional()
   @IsInt()
-  branchId: number;
+  branchId?: number;
 
+  @IsOptional()
   @IsInt()
-  warehouseId: number;
+  warehouseId?: number;
 
+  @IsOptional()
   @IsInt()
-  customerId: number;
+  customerId?: number;
 
   @IsString()
   invoiceNumber: string;
@@ -40,8 +47,9 @@ export class CreateSaleDto {
   @IsDateString()
   saleDate: string;
 
+  @IsOptional()
   @IsString()
-  status: string;
+  status?: string;
 
   @IsNumber()
   subTotal: number;

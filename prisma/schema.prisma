@@ -251,6 +251,7 @@ model SubUnit {
   deviceId  String?
 
   parentUnit Unit @relation(fields: [parentUnitId], references: [id])
+  products   Product[]
 
   @@unique([parentUnitId, name])
   @@index([parentUnitId])
@@ -285,6 +286,8 @@ model Product {
   brandId               Int?
   taxRateId             Int?
   baseUnitId            Int
+  subUnitId             Int?
+  conversionRate        Decimal? @db.Decimal(10, 4) @default(1)
   defaultPurchaseUnitId BigInt?
   defaultSalesUnitId    BigInt?
 
@@ -322,6 +325,7 @@ model Product {
   brand       Brand?       @relation(fields: [brandId], references: [id])
   taxRate     TaxRate?     @relation(fields: [taxRateId], references: [id])
   baseUnit    Unit         @relation("ProductBaseUnit", fields: [baseUnitId], references: [id])
+  subUnit     SubUnit?     @relation(fields: [subUnitId], references: [id])
 
   defaultPurchaseUnit ProductUnit? @relation("DefaultPurchaseUnit", fields: [defaultPurchaseUnitId], references: [id])
   defaultSalesUnit    ProductUnit? @relation("DefaultSalesUnit", fields: [defaultSalesUnitId], references: [id])
@@ -332,6 +336,10 @@ model Product {
   saleItems         SaleItem[]
   stockBalances     StockBalance[]
   stockTransactions StockTransaction[]
+  saleReturnItems     SaleReturnItem[]
+  purchaseReturnItems PurchaseReturnItem[]
+  quotationItems      QuotationItem[]
+  purchaseOrderItems  PurchaseOrderItem[]
 
   @@index([name])
 }
@@ -401,7 +409,8 @@ model Customer {
   version   Int       @default(1)
   deviceId  String?
 
-  sales Sale[]
+  sales      Sale[]
+  quotations Quotation[]
 }
 
 model Supplier {
@@ -419,7 +428,8 @@ model Supplier {
   version   Int       @default(1)
   deviceId  String?
 
-  purchases Purchase[]
+  purchases      Purchase[]
+  purchaseOrders PurchaseOrder[]
 }
 
 // ==========================================
@@ -428,12 +438,12 @@ model Supplier {
 
 model Purchase {
   id            BigInt   @id @default(autoincrement())
-  branchId      Int
-  warehouseId   Int
-  supplierId    Int
+  branchId      Int?
+  warehouseId   Int?
+  supplierId    Int?
   invoiceNumber String
   purchaseDate  DateTime
-  status        String
+  status        String   @default("COMPLETED")
 
   subTotal      Decimal @db.Decimal(12, 2)
   taxTotal      Decimal @db.Decimal(12, 2)
@@ -446,9 +456,9 @@ model Purchase {
   version   Int       @default(1)
   deviceId  String?
 
-  branch    Branch            @relation(fields: [branchId], references: [id])
-  warehouse Warehouse         @relation(fields: [warehouseId], references: [id])
-  supplier  Supplier          @relation(fields: [supplierId], references: [id])
+  branch    Branch?           @relation(fields: [branchId], references: [id])
+  warehouse Warehouse?        @relation(fields: [warehouseId], references: [id])
+  supplier  Supplier?         @relation(fields: [supplierId], references: [id])
   items     PurchaseItem[]
   payments  PurchasePayment[]
   returns   PurchaseReturn[]
@@ -458,12 +468,12 @@ model PurchaseItem {
   id            BigInt @id @default(autoincrement())
   purchaseId    BigInt
   productId     BigInt
-  productUnitId BigInt
+  productUnitId BigInt?
 
   quantity  Decimal @db.Decimal(12, 4)
   unitPrice Decimal @db.Decimal(12, 2)
-  discount  Decimal @db.Decimal(12, 2)
-  taxAmount Decimal @db.Decimal(12, 2)
+  discount  Decimal @db.Decimal(12, 2) @default(0)
+  taxAmount Decimal @db.Decimal(12, 2) @default(0)
   total     Decimal @db.Decimal(12, 2)
 
   status    String    @default("ACTIVE")
@@ -473,9 +483,9 @@ model PurchaseItem {
   version   Int       @default(1)
   deviceId  String?
 
-  purchase    Purchase    @relation(fields: [purchaseId], references: [id])
-  product     Product     @relation(fields: [productId], references: [id])
-  productUnit ProductUnit @relation(fields: [productUnitId], references: [id])
+  purchase    Purchase     @relation(fields: [purchaseId], references: [id])
+  product     Product      @relation(fields: [productId], references: [id])
+  productUnit ProductUnit? @relation(fields: [productUnitId], references: [id])
 }
 
 model PurchasePayment {
@@ -495,30 +505,55 @@ model PurchasePayment {
 }
 
 model PurchaseReturn {
-  id          BigInt   @id @default(autoincrement())
-  purchaseId  BigInt
-  returnDate  DateTime
-  reason      String?
-  totalAmount Decimal  @db.Decimal(12, 2)
+  id            BigInt               @id @default(autoincrement())
+  purchaseId    BigInt
+  returnNumber  String?              @unique
+  returnDate    DateTime
+  reason        String?
+  subTotal      Decimal?             @db.Decimal(12, 2)
+  taxTotal      Decimal?             @db.Decimal(12, 2)
+  discountTotal Decimal?             @db.Decimal(12, 2)
+  totalAmount   Decimal              @db.Decimal(12, 2)
 
-  status    String    @default("ACTIVE")
+  status    String    @default("Received")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
   version   Int       @default(1)
   deviceId  String?
 
-  purchase Purchase @relation(fields: [purchaseId], references: [id])
+  purchase Purchase             @relation(fields: [purchaseId], references: [id])
+  items    PurchaseReturnItem[]
+}
+
+model PurchaseReturnItem {
+  id               BigInt         @id @default(autoincrement())
+  purchaseReturnId BigInt
+  productId        BigInt
+  productUnitId    BigInt?
+  quantity         Decimal        @db.Decimal(12, 4)
+  unitPrice        Decimal        @db.Decimal(12, 2)
+  taxAmount        Decimal        @db.Decimal(12, 2) @default(0)
+  discount         Decimal        @db.Decimal(12, 2) @default(0)
+  total            Decimal        @db.Decimal(12, 2)
+
+  status    String    @default("ACTIVE")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  purchaseReturn PurchaseReturn @relation(fields: [purchaseReturnId], references: [id])
+  product        Product        @relation(fields: [productId], references: [id])
 }
 
 model Sale {
   id            BigInt   @id @default(autoincrement())
-  branchId      Int
-  warehouseId   Int
-  customerId    Int
+  branchId      Int?
+  warehouseId   Int?
+  customerId    Int?
   invoiceNumber String   @unique
   saleDate      DateTime
-  status        String
+  status        String   @default("COMPLETED")
 
   subTotal      Decimal @db.Decimal(12, 2)
   taxTotal      Decimal @db.Decimal(12, 2)
@@ -531,9 +566,9 @@ model Sale {
   version   Int       @default(1)
   deviceId  String?
 
-  branch    Branch        @relation(fields: [branchId], references: [id])
-  warehouse Warehouse     @relation(fields: [warehouseId], references: [id])
-  customer  Customer      @relation(fields: [customerId], references: [id])
+  branch    Branch?       @relation(fields: [branchId], references: [id])
+  warehouse Warehouse?    @relation(fields: [warehouseId], references: [id])
+  customer  Customer?     @relation(fields: [customerId], references: [id])
   items     SaleItem[]
   payments  SalePayment[]
   returns   SaleReturn[]
@@ -543,12 +578,12 @@ model SaleItem {
   id            BigInt @id @default(autoincrement())
   saleId        BigInt
   productId     BigInt
-  productUnitId BigInt
+  productUnitId BigInt?
 
   quantity  Decimal @db.Decimal(12, 4)
   unitPrice Decimal @db.Decimal(12, 2)
-  discount  Decimal @db.Decimal(12, 2)
-  taxAmount Decimal @db.Decimal(12, 2)
+  discount  Decimal @db.Decimal(12, 2) @default(0)
+  taxAmount Decimal @db.Decimal(12, 2) @default(0)
   total     Decimal @db.Decimal(12, 2)
 
   status    String    @default("ACTIVE")
@@ -558,9 +593,9 @@ model SaleItem {
   version   Int       @default(1)
   deviceId  String?
 
-  sale        Sale        @relation(fields: [saleId], references: [id])
-  product     Product     @relation(fields: [productId], references: [id])
-  productUnit ProductUnit @relation(fields: [productUnitId], references: [id])
+  sale        Sale         @relation(fields: [saleId], references: [id])
+  product     Product      @relation(fields: [productId], references: [id])
+  productUnit ProductUnit? @relation(fields: [productUnitId], references: [id])
 }
 
 model SalePayment {
@@ -580,20 +615,135 @@ model SalePayment {
 }
 
 model SaleReturn {
-  id          BigInt   @id @default(autoincrement())
-  saleId      BigInt
-  returnDate  DateTime
-  reason      String?
-  totalAmount Decimal  @db.Decimal(12, 2)
+  id            BigInt           @id @default(autoincrement())
+  saleId        BigInt
+  returnNumber  String?          @unique
+  returnDate    DateTime
+  reason        String?
+  subTotal      Decimal?         @db.Decimal(12, 2)
+  taxTotal      Decimal?         @db.Decimal(12, 2)
+  discountTotal Decimal?         @db.Decimal(12, 2)
+  totalAmount   Decimal          @db.Decimal(12, 2)
 
-  status    String    @default("ACTIVE")
+  status    String    @default("Received")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
   version   Int       @default(1)
   deviceId  String?
 
-  sale Sale @relation(fields: [saleId], references: [id])
+  sale  Sale             @relation(fields: [saleId], references: [id])
+  items SaleReturnItem[]
+}
+
+model SaleReturnItem {
+  id            BigInt         @id @default(autoincrement())
+  saleReturnId  BigInt
+  productId     BigInt
+  productUnitId BigInt?
+  quantity      Decimal        @db.Decimal(12, 4)
+  unitPrice     Decimal        @db.Decimal(12, 2)
+  taxAmount     Decimal        @db.Decimal(12, 2) @default(0)
+  discount      Decimal        @db.Decimal(12, 2) @default(0)
+  total         Decimal        @db.Decimal(12, 2)
+
+  status    String    @default("ACTIVE")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  saleReturn SaleReturn @relation(fields: [saleReturnId], references: [id])
+  product    Product    @relation(fields: [productId], references: [id])
+}
+
+model Quotation {
+  id              BigInt          @id @default(autoincrement())
+  quotationNumber String          @unique
+  customerId      Int?
+  branchId        Int?
+  warehouseId     Int?
+  date            DateTime
+  expiryDate      DateTime?
+  status          String          @default("Sent") // Sent, Ordered, Pending, Expired, Accepted
+  subTotal        Decimal         @db.Decimal(12, 2)
+  taxTotal        Decimal         @db.Decimal(12, 2) @default(0)
+  discountTotal   Decimal         @db.Decimal(12, 2) @default(0)
+  shipping        Decimal         @db.Decimal(12, 2) @default(0)
+  grandTotal      Decimal         @db.Decimal(12, 2)
+  notes           String?         @db.Text
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  deletedAt       DateTime?
+  version         Int             @default(1)
+  deviceId        String?
+
+  customer Customer?       @relation(fields: [customerId], references: [id])
+  items    QuotationItem[]
+}
+
+model QuotationItem {
+  id            BigInt    @id @default(autoincrement())
+  quotationId   BigInt
+  productId     BigInt
+  productUnitId BigInt?
+  quantity      Decimal   @db.Decimal(12, 4)
+  unitPrice     Decimal   @db.Decimal(12, 2)
+  discount      Decimal   @db.Decimal(12, 2) @default(0)
+  taxAmount     Decimal   @db.Decimal(12, 2) @default(0)
+  total         Decimal   @db.Decimal(12, 2)
+
+  status    String    @default("ACTIVE")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  quotation Quotation @relation(fields: [quotationId], references: [id])
+  product   Product   @relation(fields: [productId], references: [id])
+}
+
+model PurchaseOrder {
+  id            BigInt              @id @default(autoincrement())
+  orderNumber   String              @unique
+  supplierId    Int?
+  branchId      Int?
+  warehouseId   Int?
+  orderDate     DateTime
+  expectedDate  DateTime?
+  status        String              @default("Ordered") // Ordered, Pending, Received, Cancelled
+  subTotal      Decimal             @db.Decimal(12, 2)
+  taxTotal      Decimal             @db.Decimal(12, 2) @default(0)
+  discountTotal Decimal             @db.Decimal(12, 2) @default(0)
+  shipping      Decimal             @db.Decimal(12, 2) @default(0)
+  grandTotal    Decimal             @db.Decimal(12, 2)
+  notes         String?             @db.Text
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  deletedAt     DateTime?
+  version       Int                 @default(1)
+  deviceId      String?
+
+  supplier Supplier?           @relation(fields: [supplierId], references: [id])
+  items    PurchaseOrderItem[]
+}
+
+model PurchaseOrderItem {
+  id              BigInt        @id @default(autoincrement())
+  purchaseOrderId BigInt
+  productId       BigInt
+  productUnitId   BigInt?
+  quantity        Decimal       @db.Decimal(12, 4)
+  unitPrice       Decimal       @db.Decimal(12, 2)
+  discount        Decimal       @db.Decimal(12, 2) @default(0)
+  taxAmount       Decimal       @db.Decimal(12, 2) @default(0)
+  total           Decimal       @db.Decimal(12, 2)
+
+  status    String        @default("ACTIVE")
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  deletedAt DateTime?
+
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  product       Product       @relation(fields: [productId], references: [id])
 }
 
 model Payment {
@@ -641,11 +791,11 @@ model Expense {
 model StockTransaction {
   id              BigInt @id @default(autoincrement())
   productId       BigInt
-  warehouseId     Int
+  warehouseId     Int?
   transactionType String
-  referenceId     String
+  referenceId     String?
 
-  unitId       Int
+  unitId       Int?
   unitQuantity Decimal @db.Decimal(12, 4)
   baseQuantity Decimal @db.Decimal(12, 4)
 
@@ -656,9 +806,9 @@ model StockTransaction {
   version   Int       @default(1)
   deviceId  String?
 
-  product   Product   @relation(fields: [productId], references: [id])
-  warehouse Warehouse @relation(fields: [warehouseId], references: [id])
-  unit      Unit      @relation(fields: [unitId], references: [id])
+  product   Product    @relation(fields: [productId], references: [id])
+  warehouse Warehouse? @relation(fields: [warehouseId], references: [id])
+  unit      Unit?      @relation(fields: [unitId], references: [id])
 
   @@index([productId, warehouseId])
 }

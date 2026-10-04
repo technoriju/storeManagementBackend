@@ -6,6 +6,7 @@ import {
   IsNumber,
   IsEnum,
 } from "class-validator";
+import { IsNumericId } from "../../../common/validators/is-numeric-id.validator";
 
 export class CreateProductsDto {
   @ApiPropertyOptional()
@@ -34,14 +35,14 @@ export class CreateProductsDto {
   baseUnitId?: number;
 
   @ApiPropertyOptional()
-  @IsNumber()
   @IsOptional()
-  defaultPurchaseUnitId?: number;
+  @IsNumericId()
+  defaultPurchaseUnitId?: string | number;
 
   @ApiPropertyOptional()
-  @IsNumber()
   @IsOptional()
-  defaultSalesUnitId?: number;
+  @IsNumericId()
+  defaultSalesUnitId?: string | number;
 
   @ApiProperty()
   @IsString()
@@ -189,4 +190,33 @@ export class CreateProductsDto {
 
   @IsOptional()
   openingStock?: any;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  categoryName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  brandName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  unit?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  unitName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  baseUnitName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  subunit?: any;
 }

@@ -4,4 +4,5 @@ export interface ApiResponse<T> {
   data: T | null;
   timestamp?: string;
   path?: string;
+  errors?: any;
 }

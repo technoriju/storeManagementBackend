@@ -315,6 +315,7 @@ export class ReportsService {
         customer: { select: { name: true } },
         items: {
           include: {
+            productUnit: true,
             product: {
               include: {
                 prices: true,
@@ -332,12 +333,28 @@ export class ReportsService {
 
       sale.items.forEach((item) => {
         const qty = this.toNumber(item.quantity, 4);
-        const purchasePrice = item.product?.prices?.find(
-          (p) => p.priceType === "PURCHASE",
-        )?.price;
-        const unitCost = purchasePrice
+        const purchasePrice =
+          item.product?.purchasePrice ||
+          item.product?.prices?.find((p) => p.priceType === "PURCHASE")?.price;
+        let unitCost = purchasePrice
           ? this.toNumber(purchasePrice)
           : this.toNumber(item.unitPrice) * 0.7;
+
+        // Apply conversion factor if sold in sub-unit (e.g. 1 Box = 10 Pcs -> unitCost for Pcs = BoxCost / 10)
+        if (item.productUnit && item.productUnit.conversionFactor) {
+          const factor = Number(item.productUnit.conversionFactor);
+          if (factor > 0 && factor !== 1) {
+            unitCost = unitCost * factor;
+          }
+        } else if (item.product?.conversionRate && Number(item.product.conversionRate) > 1) {
+          if (
+            item.productUnitId &&
+            item.product.defaultSalesUnitId &&
+            String(item.productUnitId) === String(item.product.defaultSalesUnitId)
+          ) {
+            unitCost = unitCost / Number(item.product.conversionRate);
+          }
+        }
         estimatedCost += qty * unitCost;
       });
 
@@ -442,6 +459,7 @@ export class ReportsService {
               category: { select: { id: true, name: true } },
               brand: { select: { id: true, name: true } },
               baseUnit: { select: { id: true, name: true, shortName: true } },
+              subUnit: { select: { id: true, name: true, multiplier: true } },
               prices: true,
             },
           },
@@ -452,12 +470,23 @@ export class ReportsService {
     let estimatedStockValue = 0;
     const formattedData = balances.map((b) => {
       const quantity = this.toNumber(b.quantity, 4);
-      const purchasePrice = b.product?.prices?.find(
-        (p) => p.priceType === "PURCHASE",
-      )?.price;
+      const purchasePrice =
+        b.product?.purchasePrice ||
+        b.product?.prices?.find((p) => p.priceType === "PURCHASE")?.price;
       const unitCost = purchasePrice ? this.toNumber(purchasePrice) : 0;
       const stockValue = Number((quantity * unitCost).toFixed(2));
       estimatedStockValue += stockValue;
+
+      const baseUnitName =
+        b.product.baseUnit?.shortName || b.product.baseUnit?.name || "Unit";
+      const subUnitName = b.product.subUnit?.name || "";
+      const conversionRate = b.product.conversionRate
+        ? this.toNumber(b.product.conversionRate)
+        : b.product.subUnit?.multiplier || 1;
+      const subUnitQuantity = Number((quantity * conversionRate).toFixed(2));
+      const formattedStock = subUnitName
+        ? `${quantity} ${baseUnitName} (${subUnitQuantity} ${subUnitName})`
+        : `${quantity} ${baseUnitName}`;
 
       return {
         id: b.id,
@@ -469,7 +498,11 @@ export class ReportsService {
         brand: b.product.brand?.name || "",
         warehouseName: b.warehouse.name,
         quantity,
-        unit: b.product.baseUnit.shortName || b.product.baseUnit.name,
+        unit: baseUnitName,
+        subUnit: subUnitName,
+        conversionRate,
+        subUnitQuantity,
+        formattedStock,
         unitCost,
         stockValue,
         lowStockLevel: b.product.lowStockLevel

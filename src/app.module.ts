@@ -31,6 +31,10 @@ import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
 import { APP_GUARD } from "@nestjs/core";
 import { SubCategoriesModule } from "./modules/subcategories/subcategories.module";
 import { SubUnitsModule } from "./modules/subunits/subunits.module";
+import { QuotationsModule } from "./modules/quotations/quotations.module";
+import { PurchaseOrdersModule } from "./modules/purchase-orders/purchase-orders.module";
+import { SaleReturnsModule } from "./modules/sale-returns/sale-returns.module";
+import { PurchaseReturnsModule } from "./modules/purchase-returns/purchase-returns.module";
 
 // We will import feature modules here
 
@@ -74,6 +78,10 @@ import { SubUnitsModule } from "./modules/subunits/subunits.module";
     ]),
     SubCategoriesModule,
     SubUnitsModule,
+    QuotationsModule,
+    PurchaseOrdersModule,
+    SaleReturnsModule,
+    PurchaseReturnsModule,
     // Add other feature modules here as they are developed
   ],
   providers: [
