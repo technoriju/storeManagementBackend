@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "db:deploy": "prisma migrate deploy",
-    "build": "prisma generate && prisma migrate deploy && nest build",
+    "build": "node scripts/deploy.js",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
