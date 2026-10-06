@@ -108,6 +108,7 @@ export class SyncService {
       "purchase",
       "customer",
       "supplier",
+      "payment",
     ];
 
     for (const table of tables) {
@@ -149,6 +150,8 @@ export class SyncService {
         return this.prisma.customer;
       case "supplier":
         return this.prisma.supplier;
+      case "payment":
+        return this.prisma.payment;
       default:
         return null;
     }

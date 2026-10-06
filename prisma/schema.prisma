@@ -411,6 +411,7 @@ model Customer {
 
   sales      Sale[]
   quotations Quotation[]
+  payments   Payment[]
 }
 
 model Supplier {
@@ -430,6 +431,7 @@ model Supplier {
 
   purchases      Purchase[]
   purchaseOrders PurchaseOrder[]
+  payments       Payment[]
 }
 
 // ==========================================
@@ -748,10 +750,14 @@ model PurchaseOrderItem {
 
 model Payment {
   id              BigInt   @id @default(autoincrement())
-  paymentDate     DateTime
+  paymentDate     DateTime @default(now())
   amount          Decimal  @db.Decimal(12, 2)
   paymentMethod   String
   referenceNumber String?
+  type            String?  @default("receive")
+  notes           String?
+  customerId      Int?
+  supplierId      Int?
 
   status    String    @default("ACTIVE")
   createdAt DateTime  @default(now())
@@ -760,6 +766,8 @@ model Payment {
   version   Int       @default(1)
   deviceId  String?
 
+  customer         Customer?         @relation(fields: [customerId], references: [id])
+  supplier         Supplier?         @relation(fields: [supplierId], references: [id])
   purchasePayments PurchasePayment[]
   salePayments     SalePayment[]
 }
