@@ -451,6 +451,10 @@ model Purchase {
   taxTotal      Decimal @db.Decimal(12, 2)
   discountTotal Decimal @db.Decimal(12, 2)
   grandTotal    Decimal @db.Decimal(12, 2)
+  paid          Decimal? @db.Decimal(12, 2) @default(0)
+  due           Decimal? @db.Decimal(12, 2) @default(0)
+  paymentStatus String?  @default("Unpaid")
+  notes         String?  @db.Text
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -561,6 +565,13 @@ model Sale {
   taxTotal      Decimal @db.Decimal(12, 2)
   discountTotal Decimal @db.Decimal(12, 2)
   grandTotal    Decimal @db.Decimal(12, 2)
+  paid          Decimal? @db.Decimal(12, 2) @default(0)
+  due           Decimal? @db.Decimal(12, 2) @default(0)
+  previousDue   Decimal? @db.Decimal(12, 2) @default(0)
+  advancePayment Decimal? @db.Decimal(12, 2) @default(0)
+  showPreviousBalance Boolean? @default(false)
+  paymentStatus String?  @default("Unpaid")
+  notes         String?  @db.Text
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt

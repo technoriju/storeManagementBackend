@@ -75,4 +75,32 @@ export class CreateSaleDto {
   @IsOptional()
   @IsString()
   paymentMethod?: string;
+
+  @IsOptional()
+  @IsNumber()
+  paid?: number;
+
+  @IsOptional()
+  @IsNumber()
+  due?: number;
+
+  @IsOptional()
+  @IsNumber()
+  previousDue?: number;
+
+  @IsOptional()
+  @IsNumber()
+  advancePayment?: number;
+
+  @IsOptional()
+  showPreviousBalance?: boolean;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+
+  @IsOptional()
+  @IsString()
+  paymentStatus?: string;
 }
+

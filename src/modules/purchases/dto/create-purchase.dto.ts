@@ -75,4 +75,21 @@ export class CreatePurchaseDto {
   @IsOptional()
   @IsString()
   paymentMethod?: string;
+
+  @IsOptional()
+  @IsNumber()
+  paid?: number;
+
+  @IsOptional()
+  @IsNumber()
+  due?: number;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+
+  @IsOptional()
+  @IsString()
+  paymentStatus?: string;
 }
+

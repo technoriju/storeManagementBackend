@@ -77,6 +77,16 @@ export class PurchasesService {
         resolvedSupplierId = supp ? supp.id : null;
       }
 
+      const grandTotalNum = Number(purchaseData.grandTotal || 0);
+      const paidVal = purchaseData.paid !== undefined ? Number(purchaseData.paid) : Number(paymentAmount || 0);
+      const dueVal = purchaseData.due !== undefined ? Number(purchaseData.due) : Math.max(0, grandTotalNum - paidVal);
+      let payStatus = purchaseData.paymentStatus;
+      if (!payStatus) {
+        if (paidVal >= grandTotalNum && grandTotalNum > 0) payStatus = "Paid";
+        else if (paidVal > 0) payStatus = "Partial";
+        else payStatus = "Unpaid";
+      }
+
       // 3. Create Purchase
       const purchase = await tx.purchase.create({
         data: {
@@ -86,6 +96,10 @@ export class PurchasesService {
           supplierId: resolvedSupplierId,
           status: purchaseData.status || "COMPLETED",
           purchaseDate: new Date(purchaseData.purchaseDate),
+          paid: paidVal,
+          due: dueVal,
+          paymentStatus: payStatus,
+          notes: purchaseData.notes || null,
           items: {
             create: resolvedItems.map((item) => ({
               productId: item.productId,
@@ -144,14 +158,16 @@ export class PurchasesService {
         }
       }
 
-      // 3. Handle Payment
+      // 5. Handle Payment
       if (paymentAmount && paymentAmount > 0) {
         const payment = await tx.payment.create({
           data: {
             paymentDate: new Date(),
             amount: paymentAmount,
             paymentMethod: paymentMethod || "CASH",
-            referenceNumber: purchase.invoiceNumber
+            referenceNumber: purchase.invoiceNumber,
+            type: "pay",
+            supplierId: resolvedSupplierId,
           }
         });
 
@@ -175,6 +191,7 @@ export class PurchasesService {
         warehouse: true,
         branch: true,
         items: { include: { product: true } },
+        payments: { include: { payment: true } },
       },
       orderBy: { id: 'desc' },
     });
