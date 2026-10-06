@@ -647,6 +647,9 @@ export class ReportsService {
     const customers = await this.prisma.customer.findMany({
       where,
       include: {
+        payments: {
+          where: { deletedAt: null },
+        },
         sales: {
           where: {
             deletedAt: null,
@@ -656,7 +659,7 @@ export class ReportsService {
           include: {
             payments: {
               include: {
-                payment: { select: { amount: true } },
+                payment: { select: { id: true, amount: true } },
               },
             },
             returns: { select: { totalAmount: true } },
@@ -674,19 +677,35 @@ export class ReportsService {
       let totalBilled = 0;
       let totalPaid = 0;
       let totalReturned = 0;
+      const linkedPaymentIds = new Set<string>();
 
       customer.sales.forEach((sale) => {
         totalBilled += this.toNumber(sale.grandTotal);
+        let salePaid = 0;
         sale.payments.forEach((p) => {
-          totalPaid += this.toNumber(p.payment?.amount);
+          if (p.payment) {
+            linkedPaymentIds.add(String(p.payment.id));
+            salePaid += this.toNumber(p.payment.amount);
+          }
         });
+        if (sale.paid && this.toNumber(sale.paid) > salePaid) {
+          salePaid = this.toNumber(sale.paid);
+        }
+        totalPaid += salePaid;
         sale.returns.forEach((r) => {
           totalReturned += this.toNumber(r.totalAmount);
         });
       });
 
+      // Include standalone payments received from this customer
+      customer.payments?.forEach((p) => {
+        if (!linkedPaymentIds.has(String(p.id)) && (!p.type || p.type.toLowerCase() === "receive")) {
+          totalPaid += this.toNumber(p.amount);
+        }
+      });
+
       const outstanding = Number(
-        (totalBilled - totalPaid - totalReturned).toFixed(2),
+        Math.max(0, totalBilled - totalPaid - totalReturned).toFixed(2),
       );
       if (outstanding > 0) customersWithDue++;
 
@@ -755,6 +774,9 @@ export class ReportsService {
     const suppliers = await this.prisma.supplier.findMany({
       where,
       include: {
+        payments: {
+          where: { deletedAt: null },
+        },
         purchases: {
           where: {
             deletedAt: null,
@@ -764,7 +786,7 @@ export class ReportsService {
           include: {
             payments: {
               include: {
-                payment: { select: { amount: true } },
+                payment: { select: { id: true, amount: true } },
               },
             },
             returns: { select: { totalAmount: true } },
@@ -782,19 +804,35 @@ export class ReportsService {
       let totalPurchased = 0;
       let totalPaid = 0;
       let totalReturned = 0;
+      const linkedPaymentIds = new Set<string>();
 
       supplier.purchases.forEach((purchase) => {
         totalPurchased += this.toNumber(purchase.grandTotal);
+        let purPaid = 0;
         purchase.payments.forEach((p) => {
-          totalPaid += this.toNumber(p.payment?.amount);
+          if (p.payment) {
+            linkedPaymentIds.add(String(p.payment.id));
+            purPaid += this.toNumber(p.payment.amount);
+          }
         });
+        if (purchase.paid && this.toNumber(purchase.paid) > purPaid) {
+          purPaid = this.toNumber(purchase.paid);
+        }
+        totalPaid += purPaid;
         purchase.returns.forEach((r) => {
           totalReturned += this.toNumber(r.totalAmount);
         });
       });
 
+      // Include standalone payments made to this supplier
+      supplier.payments?.forEach((p) => {
+        if (!linkedPaymentIds.has(String(p.id)) && (!p.type || p.type.toLowerCase() === "pay")) {
+          totalPaid += this.toNumber(p.amount);
+        }
+      });
+
       const outstanding = Number(
-        (totalPurchased - totalPaid - totalReturned).toFixed(2),
+        Math.max(0, totalPurchased - totalPaid - totalReturned).toFixed(2),
       );
       if (outstanding > 0) suppliersWithDue++;
 
@@ -1554,4 +1592,139 @@ export class ReportsService {
       data: paginatedData,
     };
   }
+
+  // ==========================================
+  // 15. BALANCE SHEET REPORT
+  // ==========================================
+  async getBalanceSheetReport(filters: ReportFiltersDto) {
+    const dateRange = this.parseDateRange(filters.startDate, filters.endDate);
+
+    // 1. ASSETS
+    // A. Inventory Valuation (Sum of stock * purchase price)
+    const products = await this.prisma.product.findMany({
+      where: { deletedAt: null },
+      include: {
+        stockBalances: {
+          where: {
+            deletedAt: null,
+            ...(filters.warehouseId && { warehouseId: filters.warehouseId }),
+          },
+        },
+      },
+    });
+
+    let inventoryValuation = 0;
+    products.forEach((p) => {
+      const totalQty = p.stockBalances.reduce((sum, sb) => sum + Number(sb.quantity || 0), 0);
+      const unitCost = Number(p.purchasePrice || 0);
+      if (totalQty > 0 && unitCost > 0) {
+        inventoryValuation += totalQty * unitCost;
+      }
+    });
+    inventoryValuation = Number(inventoryValuation.toFixed(2));
+
+    // B. Cash & Bank Balance
+    const paymentsWhere: any = {
+      deletedAt: null,
+      ...(dateRange && { paymentDate: dateRange }),
+    };
+
+    const [paymentsInAgg, paymentsOutAgg, expensesAgg] = await Promise.all([
+      this.prisma.payment.aggregate({
+        where: {
+          ...paymentsWhere,
+          type: "receive",
+        },
+        _sum: { amount: true },
+      }),
+      this.prisma.payment.aggregate({
+        where: {
+          ...paymentsWhere,
+          type: "pay",
+        },
+        _sum: { amount: true },
+      }),
+      this.prisma.expense.aggregate({
+        where: {
+          deletedAt: null,
+          ...(dateRange && { expenseDate: dateRange }),
+          ...(filters.branchId && { branchId: filters.branchId }),
+        },
+        _sum: { amount: true },
+      }),
+    ]);
+
+    const totalCashIn = this.toNumber(paymentsInAgg._sum.amount);
+    const totalCashOut = this.toNumber(paymentsOutAgg._sum.amount);
+    const totalExpenses = this.toNumber(expensesAgg._sum.amount);
+    const netCashAndBank = Number(Math.max(0, totalCashIn - totalCashOut - totalExpenses).toFixed(2));
+
+    // C. Accounts Receivable (Customer Outstanding)
+    const salesAgg = await this.prisma.sale.aggregate({
+      where: {
+        deletedAt: null,
+        ...(dateRange && { saleDate: dateRange }),
+        ...(filters.branchId && { branchId: filters.branchId }),
+        ...(filters.warehouseId && { warehouseId: filters.warehouseId }),
+      },
+      _sum: {
+        grandTotal: true,
+        paid: true,
+        due: true,
+      },
+    });
+
+    const accountsReceivable = this.toNumber(salesAgg._sum.due);
+    const totalCurrentAssets = Number((inventoryValuation + netCashAndBank + accountsReceivable).toFixed(2));
+
+    // 2. LIABILITIES
+    // A. Accounts Payable (Supplier Outstanding)
+    const purchasesAgg = await this.prisma.purchase.aggregate({
+      where: {
+        deletedAt: null,
+        ...(dateRange && { purchaseDate: dateRange }),
+        ...(filters.branchId && { branchId: filters.branchId }),
+        ...(filters.warehouseId && { warehouseId: filters.warehouseId }),
+      },
+      _sum: {
+        grandTotal: true,
+        paid: true,
+        due: true,
+      },
+    });
+
+    const accountsPayable = this.toNumber(purchasesAgg._sum.due);
+    const totalCurrentLiabilities = accountsPayable;
+
+    // 3. EQUITY / NET WORTH
+    const netWorkingCapital = Number((totalCurrentAssets - totalCurrentLiabilities).toFixed(2));
+
+    return {
+      asOfDate: filters.endDate || new Date().toISOString().slice(0, 10),
+      summary: {
+        totalAssets: totalCurrentAssets,
+        totalLiabilities: totalCurrentLiabilities,
+        netEquity: netWorkingCapital,
+      },
+      statement: [
+        { section: "ASSETS", item: "Inventory Valuation", amount: inventoryValuation, type: "Current Asset" },
+        { section: "ASSETS", item: "Cash & Bank Balances", amount: netCashAndBank, type: "Current Asset" },
+        { section: "ASSETS", item: "Accounts Receivable (Customer Dues)", amount: accountsReceivable, type: "Current Asset" },
+        { section: "ASSETS", item: "TOTAL CURRENT ASSETS", amount: totalCurrentAssets, type: "Subtotal" },
+        { section: "LIABILITIES", item: "Accounts Payable (Supplier Dues)", amount: accountsPayable, type: "Current Liability" },
+        { section: "LIABILITIES", item: "TOTAL LIABILITIES", amount: totalCurrentLiabilities, type: "Subtotal" },
+        { section: "EQUITY", item: "Net Working Capital (Assets - Liabilities)", amount: netWorkingCapital, type: "Equity" },
+      ],
+      data: [
+        { category: "ASSETS", item: "Inventory Valuation", amount: inventoryValuation, type: "Current Asset" },
+        { category: "ASSETS", item: "Cash & Bank Balances", amount: netCashAndBank, type: "Current Asset" },
+        { category: "ASSETS", item: "Accounts Receivable (Customer Dues)", amount: accountsReceivable, type: "Current Asset" },
+        { category: "ASSETS", item: "TOTAL CURRENT ASSETS", amount: totalCurrentAssets, type: "Total" },
+        { category: "LIABILITIES", item: "Accounts Payable (Supplier Dues)", amount: accountsPayable, type: "Current Liability" },
+        { category: "LIABILITIES", item: "TOTAL LIABILITIES", amount: totalCurrentLiabilities, type: "Total" },
+        { category: "EQUITY", item: "Net Working Capital (Assets - Liabilities)", amount: netWorkingCapital, type: "Equity" },
+      ],
+    };
+  }
 }
+

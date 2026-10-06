@@ -189,6 +189,14 @@ export class ReportsController {
     return this.reportsService.getLowStockReport(filters);
   }
 
+  @Get("balance-sheet")
+  @ApiOperation({
+    summary: "15. Balance Sheet (Assets, Liabilities, Working Capital)",
+  })
+  async getBalanceSheetReport(@Query() filters: ReportFiltersDto) {
+    return this.reportsService.getBalanceSheetReport(filters);
+  }
+
   // ==========================================
   // EXCEL EXPORT FOR ANY REPORT
   // ==========================================
@@ -445,6 +453,19 @@ export class ReportsController {
         ];
         const result =
           await this.reportsService.getLowStockReport(exportFilters);
+        rows = result.data;
+        break;
+      }
+      case "balance-sheet": {
+        title = "Balance_Sheet";
+        columns = [
+          { header: "Category", key: "category", width: 16 },
+          { header: "Account Item", key: "item", width: 35 },
+          { header: "Amount (Rs)", key: "amount", width: 18 },
+          { header: "Type", key: "type", width: 18 },
+        ];
+        const result =
+          await this.reportsService.getBalanceSheetReport(exportFilters);
         rows = result.data;
         break;
       }

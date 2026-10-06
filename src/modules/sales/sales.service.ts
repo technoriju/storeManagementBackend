@@ -77,6 +77,16 @@ export class SalesService {
         resolvedCustomerId = cust ? cust.id : null;
       }
 
+      const grandTotalNum = Number(saleData.grandTotal || 0);
+      const paidVal = saleData.paid !== undefined ? Number(saleData.paid) : Number(paymentAmount || 0);
+      const dueVal = saleData.due !== undefined ? Number(saleData.due) : Math.max(0, grandTotalNum - paidVal);
+      let payStatus = saleData.paymentStatus;
+      if (!payStatus) {
+        if (paidVal >= grandTotalNum && grandTotalNum > 0) payStatus = "Paid";
+        else if (paidVal > 0) payStatus = "Partial";
+        else payStatus = "Unpaid";
+      }
+
       // 3. Create Sale
       const sale = await tx.sale.create({
         data: {
@@ -86,6 +96,13 @@ export class SalesService {
           customerId: resolvedCustomerId,
           status: saleData.status || "COMPLETED",
           saleDate: new Date(saleData.saleDate),
+          paid: paidVal,
+          due: dueVal,
+          paymentStatus: payStatus,
+          previousDue: saleData.previousDue !== undefined ? Number(saleData.previousDue) : 0,
+          advancePayment: saleData.advancePayment !== undefined ? Number(saleData.advancePayment) : 0,
+          showPreviousBalance: Boolean(saleData.showPreviousBalance),
+          notes: saleData.notes || null,
           items: {
             create: resolvedItems.map((item) => ({
               productId: item.productId,
@@ -150,14 +167,16 @@ export class SalesService {
         }
       }
 
-      // 3. Handle Payment
+      // 5. Handle Payment
       if (paymentAmount && paymentAmount > 0) {
         const payment = await tx.payment.create({
           data: {
             paymentDate: new Date(),
             amount: paymentAmount,
             paymentMethod: paymentMethod || "CASH",
-            referenceNumber: sale.invoiceNumber
+            referenceNumber: sale.invoiceNumber,
+            type: "receive",
+            customerId: resolvedCustomerId,
           }
         });
 
@@ -181,6 +200,7 @@ export class SalesService {
         warehouse: true,
         branch: true,
         items: { include: { product: true } },
+        payments: { include: { payment: true } },
       },
       orderBy: { id: 'desc' },
     });
