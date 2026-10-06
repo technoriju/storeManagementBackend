@@ -295,6 +295,14 @@ export class ProductsService {
     const rawStock = (dtoWithRelations as any).openingStock ?? (dtoWithRelations as any).stockQuantity ?? (dtoWithRelations as any).stock;
     const initialQty = rawStock !== undefined && rawStock !== null && !isNaN(Number(rawStock)) ? Number(rawStock) : 0;
     const data = this.mapMobileDtoToPrisma(dtoWithRelations, false);
+    if (data.subUnitId) {
+      const validSub = await this.prisma.subUnit.findFirst({
+        where: { id: Number(data.subUnitId), deletedAt: null },
+      });
+      if (!validSub) {
+        data.subUnitId = null;
+      }
+    }
     const product = await this.prisma.product.create({ data });
     if (product.baseUnitId) {
       await this.ensureProductUnits(product.id, product.baseUnitId, product.subUnitId, Number(product.conversionRate || 1));
@@ -907,6 +915,14 @@ export class ProductsService {
     await this.findOne(id);
     const rawStock = (updateProductsDto as any).openingStock ?? (updateProductsDto as any).stockQuantity;
     const data = this.mapMobileDtoToPrisma(updateProductsDto, true) as Prisma.ProductUncheckedUpdateInput;
+    if (data.subUnitId) {
+      const validSub = await this.prisma.subUnit.findFirst({
+        where: { id: Number(data.subUnitId), deletedAt: null },
+      });
+      if (!validSub) {
+        data.subUnitId = null;
+      }
+    }
     const product = await this.prisma.product.update({
       where: { id: BigInt(id) },
       data,
