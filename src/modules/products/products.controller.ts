@@ -80,6 +80,7 @@ export class ProductsController {
 
   @ApiOperation({ summary: "Update a product by id" })
   @Put(":id")
+  @Patch(":id")
   update(@Param("id") id: any, @Body() updateProductsDto: UpdateProductsDto) {
     return this.productsService.update(id, updateProductsDto);
   }

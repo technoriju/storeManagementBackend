@@ -958,9 +958,20 @@ export class ProductsService {
 
   async remove(id: any) {
     await this.findOne(id);
-    return this.prisma.product.update({
-      where: { id: BigInt(id) },
-      data: { deletedAt: new Date() },
+    const bigId = BigInt(id);
+    return this.prisma.$transaction(async (tx) => {
+      await tx.stockBalance.updateMany({
+        where: { productId: bigId },
+        data: { deletedAt: new Date() },
+      });
+      await tx.productUnit.updateMany({
+        where: { productId: bigId },
+        data: { deletedAt: new Date() },
+      });
+      return tx.product.update({
+        where: { id: bigId },
+        data: { deletedAt: new Date() },
+      });
     });
   }
 }
