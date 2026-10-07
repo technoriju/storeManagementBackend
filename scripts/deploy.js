@@ -25,13 +25,11 @@ async function main() {
   }
 
   console.log('--- Step 3: Deploying migrations or syncing schema ---');
-  let deployFailed = false;
   try {
     execSync('npx prisma migrate deploy', { stdio: 'inherit' });
     console.log('Prisma migrations applied successfully.');
   } catch (err) {
-    deployFailed = true;
-    console.warn('prisma migrate deploy encountered error. Auto-resolving and syncing with db push...');
+    console.warn('prisma migrate deploy encountered error. Auto-resolving stuck migrations...');
     const prismaFallback = new PrismaClient();
     try {
       await prismaFallback.$executeRawUnsafe(`
@@ -44,13 +42,13 @@ async function main() {
     } finally {
       await prismaFallback.$disconnect();
     }
+  }
 
-    try {
-      execSync('npx prisma db push --skip-generate --accept-data-loss', { stdio: 'inherit' });
-      console.log('Prisma db push synced schema successfully.');
-    } catch (pushErr) {
-      console.error('db push error:', pushErr.message);
-    }
+  try {
+    execSync('npx prisma db push --skip-generate --accept-data-loss', { stdio: 'inherit' });
+    console.log('Prisma db push synced schema successfully.');
+  } catch (pushErr) {
+    console.warn('Notice during db push:', pushErr.message);
   }
 
   console.log('--- Step 4: Building NestJS application ---');
