@@ -631,6 +631,7 @@ export class ReportsService {
       filters.page,
       filters.limit,
     );
+    const dateRange = this.parseDateRange(filters.startDate, filters.endDate);
 
     const where: any = {
       deletedAt: null,
@@ -648,11 +649,15 @@ export class ReportsService {
       where,
       include: {
         payments: {
-          where: { deletedAt: null },
+          where: {
+            deletedAt: null,
+            ...(dateRange && { paymentDate: dateRange }),
+          },
         },
         sales: {
           where: {
             deletedAt: null,
+            ...(dateRange && { saleDate: dateRange }),
             ...(filters.branchId && { branchId: filters.branchId }),
             ...(filters.warehouseId && { warehouseId: filters.warehouseId }),
           },
@@ -758,6 +763,7 @@ export class ReportsService {
       filters.page,
       filters.limit,
     );
+    const dateRange = this.parseDateRange(filters.startDate, filters.endDate);
 
     const where: any = {
       deletedAt: null,
@@ -775,11 +781,15 @@ export class ReportsService {
       where,
       include: {
         payments: {
-          where: { deletedAt: null },
+          where: {
+            deletedAt: null,
+            ...(dateRange && { paymentDate: dateRange }),
+          },
         },
         purchases: {
           where: {
             deletedAt: null,
+            ...(dateRange && { purchaseDate: dateRange }),
             ...(filters.branchId && { branchId: filters.branchId }),
             ...(filters.warehouseId && { warehouseId: filters.warehouseId }),
           },
