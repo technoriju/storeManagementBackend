@@ -1,0 +1,27 @@
+-- AlterTable
+ALTER TABLE `Payment` MODIFY `paymentDate` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    ADD COLUMN `customerId` INTEGER NULL,
+    ADD COLUMN `notes` VARCHAR(191) NULL,
+    ADD COLUMN `supplierId` INTEGER NULL,
+    ADD COLUMN `type` VARCHAR(191) NULL DEFAULT 'receive';
+
+-- AlterTable
+ALTER TABLE `Purchase` ADD COLUMN `due` DECIMAL(12, 2) NULL DEFAULT 0,
+    ADD COLUMN `notes` TEXT NULL,
+    ADD COLUMN `paid` DECIMAL(12, 2) NULL DEFAULT 0,
+    ADD COLUMN `paymentStatus` VARCHAR(191) NULL DEFAULT 'Unpaid';
+
+-- AlterTable
+ALTER TABLE `Sale` ADD COLUMN `advancePayment` DECIMAL(12, 2) NULL DEFAULT 0,
+    ADD COLUMN `due` DECIMAL(12, 2) NULL DEFAULT 0,
+    ADD COLUMN `notes` TEXT NULL,
+    ADD COLUMN `paid` DECIMAL(12, 2) NULL DEFAULT 0,
+    ADD COLUMN `paymentStatus` VARCHAR(191) NULL DEFAULT 'Unpaid',
+    ADD COLUMN `previousDue` DECIMAL(12, 2) NULL DEFAULT 0,
+    ADD COLUMN `showPreviousBalance` BOOLEAN NULL DEFAULT false;
+
+-- AddForeignKey
+ALTER TABLE `Payment` ADD CONSTRAINT `Payment_customerId_fkey` FOREIGN KEY (`customerId`) REFERENCES `Customer`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `Payment` ADD CONSTRAINT `Payment_supplierId_fkey` FOREIGN KEY (`supplierId`) REFERENCES `Supplier`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
