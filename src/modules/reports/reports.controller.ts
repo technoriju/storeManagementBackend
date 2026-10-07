@@ -197,6 +197,30 @@ export class ReportsController {
     return this.reportsService.getBalanceSheetReport(filters);
   }
 
+  @Get(["invoices", "invoice"])
+  @ApiOperation({
+    summary: "16. Invoices Report with tax components and payment status",
+  })
+  async getInvoiceReport(@Query() filters: ReportFiltersDto) {
+    return this.reportsService.getInvoiceReport(filters);
+  }
+
+  @Get(["products", "product"])
+  @ApiOperation({
+    summary: "17. Product Report with SKU sales, cost, profit margins and stock",
+  })
+  async getProductReport(@Query() filters: ReportFiltersDto) {
+    return this.reportsService.getProductReport(filters);
+  }
+
+  @Get(["annual", "annual-report"])
+  @ApiOperation({
+    summary: "18. Annual Report with 12-month summary of turnover, profit and expenses",
+  })
+  async getAnnualReport(@Query() filters: ReportFiltersDto) {
+    return this.reportsService.getAnnualReport(filters);
+  }
+
   // ==========================================
   // EXCEL EXPORT FOR ANY REPORT
   // ==========================================
@@ -466,6 +490,45 @@ export class ReportsController {
         ];
         const result =
           await this.reportsService.getBalanceSheetReport(exportFilters);
+        rows = result.data;
+        break;
+      }
+      case "invoices":
+      case "invoice": {
+        title = "Invoice_Report";
+        columns = [
+          { header: "Invoice #", key: "invoiceNumber", width: 18 },
+          { header: "Date", key: "date", width: 20 },
+          { header: "Customer", key: "customerName", width: 25 },
+          { header: "Taxable (Rs)", key: "taxableAmount", width: 14 },
+          { header: "Tax (Rs)", key: "taxAmount", width: 14 },
+          { header: "Grand Total", key: "grandTotal", width: 16 },
+          { header: "Paid", key: "paidAmount", width: 14 },
+          { header: "Due", key: "dueAmount", width: 14 },
+          { header: "Payment Mode", key: "paymentMethod", width: 16 },
+          { header: "Payment Status", key: "paymentStatus", width: 16 },
+        ];
+        const result =
+          await this.reportsService.getInvoiceReport(exportFilters);
+        rows = result.data;
+        break;
+      }
+      case "products":
+      case "product": {
+        title = "Product_Report";
+        columns = [
+          { header: "SKU", key: "sku", width: 16 },
+          { header: "Product Name", key: "name", width: 28 },
+          { header: "Category", key: "category", width: 18 },
+          { header: "Units Sold", key: "unitsSold", width: 14 },
+          { header: "Revenue (Rs)", key: "revenue", width: 16 },
+          { header: "Cost (Rs)", key: "cost", width: 14 },
+          { header: "Profit (Rs)", key: "profit", width: 14 },
+          { header: "Margin %", key: "margin", width: 12 },
+          { header: "Current Stock", key: "currentStock", width: 14 },
+        ];
+        const result =
+          await this.reportsService.getProductReport(exportFilters);
         rows = result.data;
         break;
       }
