@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from "@nestjs/common";
+import { Controller, Get, Post, Body, Patch, Put, Param, Delete, UseGuards } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiBearerAuth } from "@nestjs/swagger";
 import { PurchasesService } from "./purchases.service";
 import { CreatePurchaseDto } from "./dto/create-purchase.dto";
@@ -31,6 +31,7 @@ export class PurchasesController {
   }
 
   @ApiOperation({ summary: "Update a purchase by id" })
+  @Put(":id")
   @Patch(":id")
   update(@Param("id") id: any, @Body() updatePurchaseDto: UpdatePurchaseDto) {
     return this.purchasesService.update(BigInt(id), updatePurchaseDto);

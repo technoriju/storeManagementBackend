@@ -215,19 +215,267 @@ export class PurchasesService {
   }
 
   async update(id: any, updatePurchaseDto: UpdatePurchaseDto) {
-    await this.findOne(id);
-    // Note: Complex update logic (handling stock differences) skipped for terseness unless requested
-    return this.prisma.purchase.update({
-      where: { id },
-      data: updatePurchaseDto as any,
+    const purchaseId = BigInt(id);
+    const existing = await this.prisma.purchase.findFirst({
+      where: { id: purchaseId, deletedAt: null },
+      include: {
+        items: {
+          include: {
+            productUnit: true,
+          },
+        },
+      },
+    });
+    if (!existing) {
+      throw new NotFoundException("Purchase not found");
+    }
+
+    const { items, paymentAmount, paymentMethod, ...purchaseData } = updatePurchaseDto;
+
+    return this.prisma.$transaction(async (tx) => {
+      const warehouseId = purchaseData.warehouseId !== undefined
+        ? (purchaseData.warehouseId ? Number(purchaseData.warehouseId) : null)
+        : existing.warehouseId;
+
+      if (items && Array.isArray(items)) {
+        const resolvedItems: any[] = [];
+        for (const item of items) {
+          const prodId = BigInt(item.productId);
+          const product = await tx.product.findUnique({
+            where: { id: prodId },
+            include: { productUnits: true },
+          });
+          if (!product) throw new NotFoundException(`Product ${item.productId} not found`);
+
+          let puId = item.productUnitId ? BigInt(item.productUnitId) : null;
+          let pu = puId ? await tx.productUnit.findUnique({ where: { id: puId } }) : null;
+
+          if (!pu) {
+            if (product.defaultPurchaseUnitId) {
+              pu = await tx.productUnit.findUnique({ where: { id: product.defaultPurchaseUnitId } });
+            } else if (product.productUnits && product.productUnits.length > 0) {
+              pu = product.productUnits[0];
+            } else {
+              pu = await tx.productUnit.create({
+                data: {
+                  productId: product.id,
+                  unitId: product.baseUnitId,
+                  conversionFactor: 1,
+                },
+              });
+            }
+            puId = pu.id;
+          }
+
+          const conversionFactor = Number(pu.conversionFactor || 1);
+          const baseQuantity = Number(item.quantity) * conversionFactor;
+
+          resolvedItems.push({
+            ...item,
+            productId: prodId,
+            productUnitId: puId,
+            unitId: pu.unitId,
+            baseQuantity,
+          });
+        }
+
+        // 1. Reverse stock of old items
+        if (existing.warehouseId && existing.items) {
+          for (const oldItem of existing.items) {
+            const oldConv = oldItem.productUnit?.conversionFactor ? Number(oldItem.productUnit.conversionFactor) : 1;
+            const oldBaseQty = Number(oldItem.quantity) * oldConv;
+
+            const existingStock = await tx.stockBalance.findUnique({
+              where: {
+                productId_warehouseId: {
+                  productId: oldItem.productId,
+                  warehouseId: existing.warehouseId,
+                },
+              },
+            });
+
+            if (existingStock) {
+              await tx.stockBalance.update({
+                where: { id: existingStock.id },
+                data: { quantity: Number(existingStock.quantity) - oldBaseQty },
+              });
+            } else {
+              await tx.stockBalance.create({
+                data: {
+                  productId: oldItem.productId,
+                  warehouseId: existing.warehouseId,
+                  quantity: -oldBaseQty,
+                },
+              });
+            }
+          }
+        }
+
+        // 2. Add stock for new items
+        if (warehouseId) {
+          for (const newItem of resolvedItems) {
+            const existingStock = await tx.stockBalance.findUnique({
+              where: {
+                productId_warehouseId: {
+                  productId: newItem.productId,
+                  warehouseId: warehouseId,
+                },
+              },
+            });
+
+            if (existingStock) {
+              await tx.stockBalance.update({
+                where: { id: existingStock.id },
+                data: { quantity: Number(existingStock.quantity) + newItem.baseQuantity },
+              });
+            } else {
+              await tx.stockBalance.create({
+                data: {
+                  productId: newItem.productId,
+                  warehouseId: warehouseId,
+                  quantity: newItem.baseQuantity,
+                },
+              });
+            }
+
+            await tx.stockTransaction.create({
+              data: {
+                productId: newItem.productId,
+                warehouseId: warehouseId,
+                transactionType: "PURCHASE_UPDATE",
+                referenceId: `PURCHASE-${existing.id}`,
+                unitId: newItem.unitId,
+                unitQuantity: Number(newItem.quantity),
+                baseQuantity: newItem.baseQuantity,
+              },
+            });
+          }
+        }
+
+        // 3. Replace purchase items
+        await tx.purchaseItem.deleteMany({
+          where: { purchaseId },
+        });
+
+        await tx.purchaseItem.createMany({
+          data: resolvedItems.map((item) => ({
+            purchaseId,
+            productId: item.productId,
+            productUnitId: item.productUnitId,
+            quantity: Number(item.quantity),
+            unitPrice: Number(item.unitPrice),
+            discount: Number(item.discount || 0),
+            taxAmount: Number(item.taxAmount || 0),
+            total: Number(item.total),
+          })),
+        });
+      }
+
+      // 4. Update purchase scalar fields
+      const updateData: any = {};
+      if (purchaseData.subTotal !== undefined) updateData.subTotal = Number(purchaseData.subTotal);
+      if (purchaseData.taxTotal !== undefined) updateData.taxTotal = Number(purchaseData.taxTotal);
+      if (purchaseData.discountTotal !== undefined) updateData.discountTotal = Number(purchaseData.discountTotal);
+      if (purchaseData.grandTotal !== undefined) updateData.grandTotal = Number(purchaseData.grandTotal);
+      if (purchaseData.paid !== undefined) updateData.paid = Number(purchaseData.paid);
+      if (purchaseData.due !== undefined) updateData.due = Number(purchaseData.due);
+      if (purchaseData.status !== undefined) updateData.status = purchaseData.status;
+      if (purchaseData.paymentStatus !== undefined) updateData.paymentStatus = purchaseData.paymentStatus;
+      if (purchaseData.notes !== undefined) updateData.notes = purchaseData.notes;
+      if (purchaseData.warehouseId !== undefined) updateData.warehouseId = warehouseId;
+      if (purchaseData.branchId !== undefined) updateData.branchId = purchaseData.branchId ? Number(purchaseData.branchId) : null;
+      if (purchaseData.supplierId !== undefined) updateData.supplierId = purchaseData.supplierId ? Number(purchaseData.supplierId) : null;
+      if (purchaseData.purchaseDate !== undefined) updateData.purchaseDate = new Date(purchaseData.purchaseDate);
+
+      const updated = await tx.purchase.update({
+        where: { id: purchaseId },
+        data: updateData,
+        include: {
+          items: { include: { product: true } },
+          supplier: true,
+          warehouse: true,
+          branch: true,
+          payments: { include: { payment: true } },
+        },
+      });
+
+      return updated;
     });
   }
 
   async remove(id: any) {
-    await this.findOne(id);
-    return this.prisma.purchase.update({
-      where: { id },
-      data: { deletedAt: new Date() },
+    const purchaseId = BigInt(id);
+    const existing = await this.prisma.purchase.findFirst({
+      where: { id: purchaseId, deletedAt: null },
+      include: {
+        items: {
+          include: {
+            productUnit: true,
+          },
+        },
+      },
+    });
+    if (!existing) {
+      throw new NotFoundException("Purchase not found");
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      // 1. Deduct Stock if warehouse was associated
+      if (existing.warehouseId && existing.items && existing.items.length > 0) {
+        for (const item of existing.items) {
+          const convFactor = item.productUnit?.conversionFactor ? Number(item.productUnit.conversionFactor) : 1;
+          const baseQty = Number(item.quantity) * convFactor;
+
+          const existingStock = await tx.stockBalance.findUnique({
+            where: {
+              productId_warehouseId: {
+                productId: item.productId,
+                warehouseId: existing.warehouseId,
+              },
+            },
+          });
+
+          if (existingStock) {
+            await tx.stockBalance.update({
+              where: { id: existingStock.id },
+              data: { quantity: Number(existingStock.quantity) - baseQty },
+            });
+          } else {
+            await tx.stockBalance.create({
+              data: {
+                productId: item.productId,
+                warehouseId: existing.warehouseId,
+                quantity: -baseQty,
+              },
+            });
+          }
+
+          // Create reversing StockTransaction
+          await tx.stockTransaction.create({
+            data: {
+              productId: item.productId,
+              warehouseId: existing.warehouseId,
+              transactionType: "PURCHASE_CANCELLED",
+              referenceId: `PURCHASE-${existing.id}`,
+              unitId: item.productUnit?.unitId ?? null,
+              unitQuantity: -Number(item.quantity),
+              baseQuantity: -baseQty,
+            },
+          });
+        }
+      }
+
+      // 2. Mark items soft-deleted
+      await tx.purchaseItem.updateMany({
+        where: { purchaseId },
+        data: { deletedAt: new Date() },
+      });
+
+      // 3. Mark purchase soft-deleted
+      return tx.purchase.update({
+        where: { id: purchaseId },
+        data: { deletedAt: new Date() },
+      });
     });
   }
 }
