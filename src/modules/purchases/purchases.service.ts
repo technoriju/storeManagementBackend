@@ -21,34 +21,84 @@ export class PurchasesService {
         });
         if (!product) throw new NotFoundException(`Product ${item.productId} not found`);
 
-        let puId = item.productUnitId ? BigInt(item.productUnitId) : null;
-        let pu = puId ? await tx.productUnit.findUnique({ where: { id: puId } }) : null;
-
-        if (!pu) {
-          if (product.defaultPurchaseUnitId) {
-            pu = await tx.productUnit.findUnique({ where: { id: product.defaultPurchaseUnitId } });
-          } else if (product.productUnits && product.productUnits.length > 0) {
-            pu = product.productUnits[0];
-          } else {
-            pu = await tx.productUnit.create({
-              data: {
-                productId: product.id,
-                unitId: product.baseUnitId,
-                conversionFactor: 1,
-              },
-            });
+        let targetFactor = 1;
+          if ((item as any).unitType === 'base') {
+            targetFactor = Number((item as any).conversionRate || 1);
+          } else if ((item as any).unitType === 'sub') {
+            targetFactor = 1;
           }
-          puId = pu.id;
-        }
 
-        const conversionFactor = Number(pu.conversionFactor || 1);
-        const baseQuantity = item.quantity * conversionFactor;
+          let puId = item.productUnitId ? BigInt(item.productUnitId) : null;
+          let pu = puId ? await tx.productUnit.findUnique({ where: { id: puId } }) : null;
+
+          if (!pu && (item as any).unitType) {
+            // Find or create product unit that matches targetFactor
+            pu = product.productUnits?.find(u => Number(u.conversionFactor) === targetFactor)
+              || product.productUnits?.find(u => u.unitId === (product.baseUnitId || 1))
+              || (product.productUnits && product.productUnits.length > 0 ? product.productUnits[0] : null);
+            if (!pu) {
+              const targetUnitId = product.baseUnitId || 1;
+              const existingUnit = await tx.productUnit.findFirst({
+                where: { productId: product.id, unitId: targetUnitId },
+              });
+              if (existingUnit) {
+                pu = existingUnit;
+              } else {
+                try {
+                  pu = await tx.productUnit.create({
+                    data: {
+                      productId: product.id,
+                      unitId: targetUnitId,
+                      conversionFactor: targetFactor,
+                    },
+                  });
+                } catch {
+                  pu = await tx.productUnit.findFirst({
+                    where: { productId: product.id, unitId: targetUnitId },
+                  });
+                }
+              }
+            }
+            puId = pu ? pu.id : null;
+          } else if (!pu) {
+            if (product.defaultSalesUnitId) {
+              pu = await tx.productUnit.findUnique({ where: { id: product.defaultSalesUnitId } });
+            } else if (product.productUnits && product.productUnits.length > 0) {
+              pu = product.productUnits[0];
+            } else {
+              const targetUnitId = product.baseUnitId || 1;
+              const existingUnit = await tx.productUnit.findFirst({
+                where: { productId: product.id, unitId: targetUnitId },
+              });
+              if (existingUnit) {
+                pu = existingUnit;
+              } else {
+                try {
+                  pu = await tx.productUnit.create({
+                    data: {
+                      productId: product.id,
+                      unitId: targetUnitId,
+                      conversionFactor: 1,
+                    },
+                  });
+                } catch {
+                  pu = await tx.productUnit.findFirst({
+                    where: { productId: product.id, unitId: targetUnitId },
+                  });
+                }
+              }
+            }
+            puId = pu ? pu.id : null;
+          }
+
+          const conversionFactor = pu ? Number(pu.conversionFactor || 1) : targetFactor;
+          const baseQuantity = Number(item.quantity) * conversionFactor;
 
         resolvedItems.push({
           ...item,
           productId: prodId,
           productUnitId: puId,
-          unitId: pu.unitId,
+          unitId: pu?.unitId ?? (product.baseUnitId || 1),
           baseQuantity,
         });
       }
@@ -299,34 +349,84 @@ export class PurchasesService {
           });
           if (!product) throw new NotFoundException(`Product ${item.productId} not found`);
 
+          let targetFactor = 1;
+          if ((item as any).unitType === 'base') {
+            targetFactor = Number((item as any).conversionRate || 1);
+          } else if ((item as any).unitType === 'sub') {
+            targetFactor = 1;
+          }
+
           let puId = item.productUnitId ? BigInt(item.productUnitId) : null;
           let pu = puId ? await tx.productUnit.findUnique({ where: { id: puId } }) : null;
 
-          if (!pu) {
-            if (product.defaultPurchaseUnitId) {
-              pu = await tx.productUnit.findUnique({ where: { id: product.defaultPurchaseUnitId } });
+          if (!pu && (item as any).unitType) {
+            // Find or create product unit that matches targetFactor
+            pu = product.productUnits?.find(u => Number(u.conversionFactor) === targetFactor)
+              || product.productUnits?.find(u => u.unitId === (product.baseUnitId || 1))
+              || (product.productUnits && product.productUnits.length > 0 ? product.productUnits[0] : null);
+            if (!pu) {
+              const targetUnitId = product.baseUnitId || 1;
+              const existingUnit = await tx.productUnit.findFirst({
+                where: { productId: product.id, unitId: targetUnitId },
+              });
+              if (existingUnit) {
+                pu = existingUnit;
+              } else {
+                try {
+                  pu = await tx.productUnit.create({
+                    data: {
+                      productId: product.id,
+                      unitId: targetUnitId,
+                      conversionFactor: targetFactor,
+                    },
+                  });
+                } catch {
+                  pu = await tx.productUnit.findFirst({
+                    where: { productId: product.id, unitId: targetUnitId },
+                  });
+                }
+              }
+            }
+            puId = pu ? pu.id : null;
+          } else if (!pu) {
+            if (product.defaultSalesUnitId) {
+              pu = await tx.productUnit.findUnique({ where: { id: product.defaultSalesUnitId } });
             } else if (product.productUnits && product.productUnits.length > 0) {
               pu = product.productUnits[0];
             } else {
-              pu = await tx.productUnit.create({
-                data: {
-                  productId: product.id,
-                  unitId: product.baseUnitId,
-                  conversionFactor: 1,
-                },
+              const targetUnitId = product.baseUnitId || 1;
+              const existingUnit = await tx.productUnit.findFirst({
+                where: { productId: product.id, unitId: targetUnitId },
               });
+              if (existingUnit) {
+                pu = existingUnit;
+              } else {
+                try {
+                  pu = await tx.productUnit.create({
+                    data: {
+                      productId: product.id,
+                      unitId: targetUnitId,
+                      conversionFactor: 1,
+                    },
+                  });
+                } catch {
+                  pu = await tx.productUnit.findFirst({
+                    where: { productId: product.id, unitId: targetUnitId },
+                  });
+                }
+              }
             }
-            puId = pu.id;
+            puId = pu ? pu.id : null;
           }
 
-          const conversionFactor = Number(pu.conversionFactor || 1);
+          const conversionFactor = pu ? Number(pu.conversionFactor || 1) : targetFactor;
           const baseQuantity = Number(item.quantity) * conversionFactor;
 
           resolvedItems.push({
             ...item,
             productId: prodId,
             productUnitId: puId,
-            unitId: pu.unitId,
+            unitId: pu?.unitId ?? (product.baseUnitId || 1),
             baseQuantity,
           });
         }

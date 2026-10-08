@@ -121,217 +121,156 @@
   - You are about to alter the column `branchId` on the `warehouse` table. The data in that column could be lost. The data in that column will be cast from `VarChar(191)` to `Int`.
 
 */
--- DropForeignKey
 ALTER TABLE `AuditLog` DROP FOREIGN KEY `AuditLog_userId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `Branch` DROP FOREIGN KEY `Branch_companyId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `Device` DROP FOREIGN KEY `Device_branchId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `Expense` DROP FOREIGN KEY `Expense_branchId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `Expense` DROP FOREIGN KEY `Expense_userId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `InvoiceTemplateSetting` DROP FOREIGN KEY `InvoiceTemplateSetting_templateId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `Product` DROP FOREIGN KEY `Product_baseUnitId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `Product` DROP FOREIGN KEY `Product_brandId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `Product` DROP FOREIGN KEY `Product_categoryId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `Product` DROP FOREIGN KEY `Product_defaultPurchaseUnitId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `Product` DROP FOREIGN KEY `Product_defaultSalesUnitId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `Product` DROP FOREIGN KEY `Product_subCategoryId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `Product` DROP FOREIGN KEY `Product_taxRateId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `ProductPrice` DROP FOREIGN KEY `ProductPrice_productId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `ProductPrice` DROP FOREIGN KEY `ProductPrice_productUnitId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `ProductUnit` DROP FOREIGN KEY `ProductUnit_productId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `ProductUnit` DROP FOREIGN KEY `ProductUnit_unitId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `Purchase` DROP FOREIGN KEY `Purchase_branchId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `Purchase` DROP FOREIGN KEY `Purchase_supplierId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `Purchase` DROP FOREIGN KEY `Purchase_warehouseId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `PurchaseItem` DROP FOREIGN KEY `PurchaseItem_productId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `PurchaseItem` DROP FOREIGN KEY `PurchaseItem_productUnitId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `PurchaseItem` DROP FOREIGN KEY `PurchaseItem_purchaseId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `PurchasePayment` DROP FOREIGN KEY `PurchasePayment_paymentId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `PurchasePayment` DROP FOREIGN KEY `PurchasePayment_purchaseId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `PurchaseReturn` DROP FOREIGN KEY `PurchaseReturn_purchaseId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `RefreshToken` DROP FOREIGN KEY `RefreshToken_userId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `RolePermission` DROP FOREIGN KEY `RolePermission_permissionId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `RolePermission` DROP FOREIGN KEY `RolePermission_roleId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `Sale` DROP FOREIGN KEY `Sale_branchId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `Sale` DROP FOREIGN KEY `Sale_customerId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `Sale` DROP FOREIGN KEY `Sale_warehouseId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `SaleItem` DROP FOREIGN KEY `SaleItem_productId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `SaleItem` DROP FOREIGN KEY `SaleItem_productUnitId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `SaleItem` DROP FOREIGN KEY `SaleItem_saleId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `SalePayment` DROP FOREIGN KEY `SalePayment_paymentId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `SalePayment` DROP FOREIGN KEY `SalePayment_saleId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `SaleReturn` DROP FOREIGN KEY `SaleReturn_saleId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `StockBalance` DROP FOREIGN KEY `StockBalance_productId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `StockBalance` DROP FOREIGN KEY `StockBalance_warehouseId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `StockTransaction` DROP FOREIGN KEY `StockTransaction_productId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `StockTransaction` DROP FOREIGN KEY `StockTransaction_unitId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `StockTransaction` DROP FOREIGN KEY `StockTransaction_warehouseId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `SubCategory` DROP FOREIGN KEY `SubCategory_categoryId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `User` DROP FOREIGN KEY `User_branchId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `User` DROP FOREIGN KEY `User_companyId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `User` DROP FOREIGN KEY `User_roleId_fkey`;
 
--- DropForeignKey
 ALTER TABLE `Warehouse` DROP FOREIGN KEY `Warehouse_branchId_fkey`;
 
--- AlterTable
 ALTER TABLE `AuditLog` DROP PRIMARY KEY,
     MODIFY `id` BIGINT NOT NULL AUTO_INCREMENT,
     MODIFY `userId` INTEGER NULL,
     ADD PRIMARY KEY (`id`);
 
--- AlterTable
 ALTER TABLE `Branch` DROP PRIMARY KEY,
     MODIFY `id` INTEGER NOT NULL AUTO_INCREMENT,
     MODIFY `companyId` INTEGER NOT NULL,
     ADD PRIMARY KEY (`id`);
 
--- AlterTable
 ALTER TABLE `Brand` DROP PRIMARY KEY,
     MODIFY `id` INTEGER NOT NULL AUTO_INCREMENT,
     ADD PRIMARY KEY (`id`);
 
--- AlterTable
 ALTER TABLE `Category` DROP PRIMARY KEY,
     MODIFY `id` INTEGER NOT NULL AUTO_INCREMENT,
     ADD PRIMARY KEY (`id`);
 
--- AlterTable
 ALTER TABLE `Company` DROP PRIMARY KEY,
     MODIFY `id` INTEGER NOT NULL AUTO_INCREMENT,
     ADD PRIMARY KEY (`id`);
 
--- AlterTable
 ALTER TABLE `Customer` DROP PRIMARY KEY,
     MODIFY `id` INTEGER NOT NULL AUTO_INCREMENT,
     ADD PRIMARY KEY (`id`);
 
--- AlterTable
 ALTER TABLE `Device` DROP PRIMARY KEY,
     MODIFY `id` INTEGER NOT NULL AUTO_INCREMENT,
     MODIFY `branchId` INTEGER NULL,
     ADD PRIMARY KEY (`id`);
 
--- AlterTable
 ALTER TABLE `Expense` DROP PRIMARY KEY,
     MODIFY `id` BIGINT NOT NULL AUTO_INCREMENT,
     MODIFY `branchId` INTEGER NOT NULL,
     MODIFY `userId` INTEGER NOT NULL,
     ADD PRIMARY KEY (`id`);
 
--- AlterTable
 ALTER TABLE `InvoiceTemplate` DROP PRIMARY KEY,
     MODIFY `id` INTEGER NOT NULL AUTO_INCREMENT,
     ADD PRIMARY KEY (`id`);
 
--- AlterTable
 ALTER TABLE `InvoiceTemplateSetting` DROP PRIMARY KEY,
     MODIFY `id` INTEGER NOT NULL AUTO_INCREMENT,
     MODIFY `templateId` INTEGER NOT NULL,
     ADD PRIMARY KEY (`id`);
 
--- AlterTable
 ALTER TABLE `Payment` DROP PRIMARY KEY,
     MODIFY `id` BIGINT NOT NULL AUTO_INCREMENT,
     ADD PRIMARY KEY (`id`);
 
--- AlterTable
 ALTER TABLE `Permission` DROP PRIMARY KEY,
     MODIFY `id` INTEGER NOT NULL AUTO_INCREMENT,
     ADD PRIMARY KEY (`id`);
 
--- AlterTable
 ALTER TABLE `Product` DROP PRIMARY KEY,
     MODIFY `id` BIGINT NOT NULL AUTO_INCREMENT,
     MODIFY `categoryId` INTEGER NULL,
@@ -343,21 +282,18 @@ ALTER TABLE `Product` DROP PRIMARY KEY,
     MODIFY `defaultSalesUnitId` BIGINT NULL,
     ADD PRIMARY KEY (`id`);
 
--- AlterTable
 ALTER TABLE `ProductPrice` DROP PRIMARY KEY,
     MODIFY `id` BIGINT NOT NULL AUTO_INCREMENT,
     MODIFY `productId` BIGINT NOT NULL,
     MODIFY `productUnitId` BIGINT NOT NULL,
     ADD PRIMARY KEY (`id`);
 
--- AlterTable
 ALTER TABLE `ProductUnit` DROP PRIMARY KEY,
     MODIFY `id` BIGINT NOT NULL AUTO_INCREMENT,
     MODIFY `productId` BIGINT NOT NULL,
     MODIFY `unitId` INTEGER NOT NULL,
     ADD PRIMARY KEY (`id`);
 
--- AlterTable
 ALTER TABLE `Purchase` DROP PRIMARY KEY,
     MODIFY `id` BIGINT NOT NULL AUTO_INCREMENT,
     MODIFY `branchId` INTEGER NOT NULL,
@@ -365,7 +301,6 @@ ALTER TABLE `Purchase` DROP PRIMARY KEY,
     MODIFY `supplierId` INTEGER NOT NULL,
     ADD PRIMARY KEY (`id`);
 
--- AlterTable
 ALTER TABLE `PurchaseItem` DROP PRIMARY KEY,
     MODIFY `id` BIGINT NOT NULL AUTO_INCREMENT,
     MODIFY `purchaseId` BIGINT NOT NULL,
@@ -373,38 +308,32 @@ ALTER TABLE `PurchaseItem` DROP PRIMARY KEY,
     MODIFY `productUnitId` BIGINT NOT NULL,
     ADD PRIMARY KEY (`id`);
 
--- AlterTable
 ALTER TABLE `PurchasePayment` DROP PRIMARY KEY,
     MODIFY `id` BIGINT NOT NULL AUTO_INCREMENT,
     MODIFY `purchaseId` BIGINT NOT NULL,
     MODIFY `paymentId` BIGINT NOT NULL,
     ADD PRIMARY KEY (`id`);
 
--- AlterTable
 ALTER TABLE `PurchaseReturn` DROP PRIMARY KEY,
     MODIFY `id` BIGINT NOT NULL AUTO_INCREMENT,
     MODIFY `purchaseId` BIGINT NOT NULL,
     ADD PRIMARY KEY (`id`);
 
--- AlterTable
 ALTER TABLE `RefreshToken` DROP PRIMARY KEY,
     MODIFY `id` BIGINT NOT NULL AUTO_INCREMENT,
     MODIFY `userId` INTEGER NOT NULL,
     ADD PRIMARY KEY (`id`);
 
--- AlterTable
 ALTER TABLE `Role` DROP PRIMARY KEY,
     MODIFY `id` INTEGER NOT NULL AUTO_INCREMENT,
     ADD PRIMARY KEY (`id`);
 
--- AlterTable
 ALTER TABLE `RolePermission` DROP PRIMARY KEY,
     MODIFY `id` INTEGER NOT NULL AUTO_INCREMENT,
     MODIFY `roleId` INTEGER NOT NULL,
     MODIFY `permissionId` INTEGER NOT NULL,
     ADD PRIMARY KEY (`id`);
 
--- AlterTable
 ALTER TABLE `Sale` DROP PRIMARY KEY,
     MODIFY `id` BIGINT NOT NULL AUTO_INCREMENT,
     MODIFY `branchId` INTEGER NOT NULL,
@@ -412,7 +341,6 @@ ALTER TABLE `Sale` DROP PRIMARY KEY,
     MODIFY `customerId` INTEGER NOT NULL,
     ADD PRIMARY KEY (`id`);
 
--- AlterTable
 ALTER TABLE `SaleItem` DROP PRIMARY KEY,
     MODIFY `id` BIGINT NOT NULL AUTO_INCREMENT,
     MODIFY `saleId` BIGINT NOT NULL,
@@ -420,27 +348,23 @@ ALTER TABLE `SaleItem` DROP PRIMARY KEY,
     MODIFY `productUnitId` BIGINT NOT NULL,
     ADD PRIMARY KEY (`id`);
 
--- AlterTable
 ALTER TABLE `SalePayment` DROP PRIMARY KEY,
     MODIFY `id` BIGINT NOT NULL AUTO_INCREMENT,
     MODIFY `saleId` BIGINT NOT NULL,
     MODIFY `paymentId` BIGINT NOT NULL,
     ADD PRIMARY KEY (`id`);
 
--- AlterTable
 ALTER TABLE `SaleReturn` DROP PRIMARY KEY,
     MODIFY `id` BIGINT NOT NULL AUTO_INCREMENT,
     MODIFY `saleId` BIGINT NOT NULL,
     ADD PRIMARY KEY (`id`);
 
--- AlterTable
 ALTER TABLE `StockBalance` DROP PRIMARY KEY,
     MODIFY `id` BIGINT NOT NULL AUTO_INCREMENT,
     MODIFY `productId` BIGINT NOT NULL,
     MODIFY `warehouseId` INTEGER NOT NULL,
     ADD PRIMARY KEY (`id`);
 
--- AlterTable
 ALTER TABLE `StockTransaction` DROP PRIMARY KEY,
     MODIFY `id` BIGINT NOT NULL AUTO_INCREMENT,
     MODIFY `productId` BIGINT NOT NULL,
@@ -448,33 +372,27 @@ ALTER TABLE `StockTransaction` DROP PRIMARY KEY,
     MODIFY `unitId` INTEGER NOT NULL,
     ADD PRIMARY KEY (`id`);
 
--- AlterTable
 ALTER TABLE `SubCategory` DROP PRIMARY KEY,
     MODIFY `id` INTEGER NOT NULL AUTO_INCREMENT,
     MODIFY `categoryId` INTEGER NOT NULL,
     ADD PRIMARY KEY (`id`);
 
--- AlterTable
 ALTER TABLE `Supplier` DROP PRIMARY KEY,
     MODIFY `id` INTEGER NOT NULL AUTO_INCREMENT,
     ADD PRIMARY KEY (`id`);
 
--- AlterTable
 ALTER TABLE `SyncQueue` DROP PRIMARY KEY,
     MODIFY `id` BIGINT NOT NULL AUTO_INCREMENT,
     ADD PRIMARY KEY (`id`);
 
--- AlterTable
 ALTER TABLE `TaxRate` DROP PRIMARY KEY,
     MODIFY `id` INTEGER NOT NULL AUTO_INCREMENT,
     ADD PRIMARY KEY (`id`);
 
--- AlterTable
 ALTER TABLE `Unit` DROP PRIMARY KEY,
     MODIFY `id` INTEGER NOT NULL AUTO_INCREMENT,
     ADD PRIMARY KEY (`id`);
 
--- AlterTable
 ALTER TABLE `User` DROP PRIMARY KEY,
     MODIFY `id` INTEGER NOT NULL AUTO_INCREMENT,
     MODIFY `companyId` INTEGER NOT NULL,
@@ -482,152 +400,103 @@ ALTER TABLE `User` DROP PRIMARY KEY,
     MODIFY `roleId` INTEGER NOT NULL,
     ADD PRIMARY KEY (`id`);
 
--- AlterTable
 ALTER TABLE `Warehouse` DROP PRIMARY KEY,
     MODIFY `id` INTEGER NOT NULL AUTO_INCREMENT,
     MODIFY `branchId` INTEGER NOT NULL,
     ADD PRIMARY KEY (`id`);
 
--- AddForeignKey
 ALTER TABLE `Branch` ADD CONSTRAINT `Branch_companyId_fkey` FOREIGN KEY (`companyId`) REFERENCES `Company`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `Warehouse` ADD CONSTRAINT `Warehouse_branchId_fkey` FOREIGN KEY (`branchId`) REFERENCES `Branch`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `Device` ADD CONSTRAINT `Device_branchId_fkey` FOREIGN KEY (`branchId`) REFERENCES `Branch`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `User` ADD CONSTRAINT `User_companyId_fkey` FOREIGN KEY (`companyId`) REFERENCES `Company`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `User` ADD CONSTRAINT `User_branchId_fkey` FOREIGN KEY (`branchId`) REFERENCES `Branch`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `User` ADD CONSTRAINT `User_roleId_fkey` FOREIGN KEY (`roleId`) REFERENCES `Role`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `RolePermission` ADD CONSTRAINT `RolePermission_roleId_fkey` FOREIGN KEY (`roleId`) REFERENCES `Role`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `RolePermission` ADD CONSTRAINT `RolePermission_permissionId_fkey` FOREIGN KEY (`permissionId`) REFERENCES `Permission`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `SubCategory` ADD CONSTRAINT `SubCategory_categoryId_fkey` FOREIGN KEY (`categoryId`) REFERENCES `Category`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `Product` ADD CONSTRAINT `Product_categoryId_fkey` FOREIGN KEY (`categoryId`) REFERENCES `Category`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `Product` ADD CONSTRAINT `Product_subCategoryId_fkey` FOREIGN KEY (`subCategoryId`) REFERENCES `SubCategory`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `Product` ADD CONSTRAINT `Product_brandId_fkey` FOREIGN KEY (`brandId`) REFERENCES `Brand`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `Product` ADD CONSTRAINT `Product_taxRateId_fkey` FOREIGN KEY (`taxRateId`) REFERENCES `TaxRate`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `Product` ADD CONSTRAINT `Product_baseUnitId_fkey` FOREIGN KEY (`baseUnitId`) REFERENCES `Unit`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `Product` ADD CONSTRAINT `Product_defaultPurchaseUnitId_fkey` FOREIGN KEY (`defaultPurchaseUnitId`) REFERENCES `ProductUnit`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `Product` ADD CONSTRAINT `Product_defaultSalesUnitId_fkey` FOREIGN KEY (`defaultSalesUnitId`) REFERENCES `ProductUnit`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `ProductUnit` ADD CONSTRAINT `ProductUnit_productId_fkey` FOREIGN KEY (`productId`) REFERENCES `Product`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `ProductUnit` ADD CONSTRAINT `ProductUnit_unitId_fkey` FOREIGN KEY (`unitId`) REFERENCES `Unit`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `ProductPrice` ADD CONSTRAINT `ProductPrice_productId_fkey` FOREIGN KEY (`productId`) REFERENCES `Product`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `ProductPrice` ADD CONSTRAINT `ProductPrice_productUnitId_fkey` FOREIGN KEY (`productUnitId`) REFERENCES `ProductUnit`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `Purchase` ADD CONSTRAINT `Purchase_branchId_fkey` FOREIGN KEY (`branchId`) REFERENCES `Branch`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `Purchase` ADD CONSTRAINT `Purchase_warehouseId_fkey` FOREIGN KEY (`warehouseId`) REFERENCES `Warehouse`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `Purchase` ADD CONSTRAINT `Purchase_supplierId_fkey` FOREIGN KEY (`supplierId`) REFERENCES `Supplier`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `PurchaseItem` ADD CONSTRAINT `PurchaseItem_purchaseId_fkey` FOREIGN KEY (`purchaseId`) REFERENCES `Purchase`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `PurchaseItem` ADD CONSTRAINT `PurchaseItem_productId_fkey` FOREIGN KEY (`productId`) REFERENCES `Product`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `PurchaseItem` ADD CONSTRAINT `PurchaseItem_productUnitId_fkey` FOREIGN KEY (`productUnitId`) REFERENCES `ProductUnit`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `PurchasePayment` ADD CONSTRAINT `PurchasePayment_purchaseId_fkey` FOREIGN KEY (`purchaseId`) REFERENCES `Purchase`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `PurchasePayment` ADD CONSTRAINT `PurchasePayment_paymentId_fkey` FOREIGN KEY (`paymentId`) REFERENCES `Payment`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `PurchaseReturn` ADD CONSTRAINT `PurchaseReturn_purchaseId_fkey` FOREIGN KEY (`purchaseId`) REFERENCES `Purchase`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `Sale` ADD CONSTRAINT `Sale_branchId_fkey` FOREIGN KEY (`branchId`) REFERENCES `Branch`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `Sale` ADD CONSTRAINT `Sale_warehouseId_fkey` FOREIGN KEY (`warehouseId`) REFERENCES `Warehouse`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `Sale` ADD CONSTRAINT `Sale_customerId_fkey` FOREIGN KEY (`customerId`) REFERENCES `Customer`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `SaleItem` ADD CONSTRAINT `SaleItem_saleId_fkey` FOREIGN KEY (`saleId`) REFERENCES `Sale`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `SaleItem` ADD CONSTRAINT `SaleItem_productId_fkey` FOREIGN KEY (`productId`) REFERENCES `Product`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `SaleItem` ADD CONSTRAINT `SaleItem_productUnitId_fkey` FOREIGN KEY (`productUnitId`) REFERENCES `ProductUnit`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `SalePayment` ADD CONSTRAINT `SalePayment_saleId_fkey` FOREIGN KEY (`saleId`) REFERENCES `Sale`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `SalePayment` ADD CONSTRAINT `SalePayment_paymentId_fkey` FOREIGN KEY (`paymentId`) REFERENCES `Payment`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `SaleReturn` ADD CONSTRAINT `SaleReturn_saleId_fkey` FOREIGN KEY (`saleId`) REFERENCES `Sale`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `Expense` ADD CONSTRAINT `Expense_branchId_fkey` FOREIGN KEY (`branchId`) REFERENCES `Branch`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `Expense` ADD CONSTRAINT `Expense_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `User`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `StockTransaction` ADD CONSTRAINT `StockTransaction_productId_fkey` FOREIGN KEY (`productId`) REFERENCES `Product`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `StockTransaction` ADD CONSTRAINT `StockTransaction_warehouseId_fkey` FOREIGN KEY (`warehouseId`) REFERENCES `Warehouse`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `StockTransaction` ADD CONSTRAINT `StockTransaction_unitId_fkey` FOREIGN KEY (`unitId`) REFERENCES `Unit`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `StockBalance` ADD CONSTRAINT `StockBalance_productId_fkey` FOREIGN KEY (`productId`) REFERENCES `Product`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `StockBalance` ADD CONSTRAINT `StockBalance_warehouseId_fkey` FOREIGN KEY (`warehouseId`) REFERENCES `Warehouse`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `InvoiceTemplateSetting` ADD CONSTRAINT `InvoiceTemplateSetting_templateId_fkey` FOREIGN KEY (`templateId`) REFERENCES `InvoiceTemplate`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `AuditLog` ADD CONSTRAINT `AuditLog_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `User`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
--- AddForeignKey
 ALTER TABLE `RefreshToken` ADD CONSTRAINT `RefreshToken_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `User`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;

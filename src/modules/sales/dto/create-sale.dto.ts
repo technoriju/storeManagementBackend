@@ -26,6 +26,14 @@ export class SaleItemDto {
 
   @IsNumber()
   total: number;
+
+  @IsOptional()
+  @IsString()
+  unitType?: string;
+
+  @IsOptional()
+  @IsNumber()
+  conversionRate?: number;
 }
 
 export class CreateSaleDto {
