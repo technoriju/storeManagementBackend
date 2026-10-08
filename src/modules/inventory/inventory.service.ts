@@ -441,7 +441,7 @@ export class InventoryService {
       warehouseName: tx.warehouse?.name || "Warehouse",
       transactionType: tx.transactionType,
       referenceId: tx.referenceId,
-      unitQuantity: Number(tx.unitQuantity),
+      unitQuantity: Math.abs(Number(tx.unitQuantity)),
       baseQuantity: Number(tx.baseQuantity),
       unitName: tx.unit?.shortName || tx.unit?.name || "pcs",
       createdAt: tx.createdAt,
