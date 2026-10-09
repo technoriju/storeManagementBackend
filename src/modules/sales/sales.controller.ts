@@ -26,20 +26,20 @@ export class SalesController {
 
   @ApiOperation({ summary: "Get a sale by id" })
   @Get(":id")
-  findOne(@Param("id") id: any) {
-    return this.salesService.findOne(BigInt(id));
+  findOne(@Param("id") id: string) {
+    return this.salesService.findOne(id);
   }
 
   @ApiOperation({ summary: "Update a sale by id" })
   @Put(":id")
   @Patch(":id")
-  update(@Param("id") id: any, @Body() updateSaleDto: UpdateSaleDto) {
-    return this.salesService.update(BigInt(id), updateSaleDto);
+  update(@Param("id") id: string, @Body() updateSaleDto: UpdateSaleDto) {
+    return this.salesService.update(id, updateSaleDto);
   }
 
-  @ApiOperation({ summary: "Delete a sale by id" })
+  @ApiOperation({ summary: "Delete a sale by id or invoice number" })
   @Delete(":id")
-  remove(@Param("id") id: any) {
-    return this.salesService.remove(BigInt(id));
+  remove(@Param("id") id: string) {
+    return this.salesService.remove(id);
   }
 }

@@ -26,6 +26,14 @@ export class PurchaseItemDto {
 
   @IsNumber()
   total: number;
+
+  @IsOptional()
+  @IsString()
+  unitType?: string;
+
+  @IsOptional()
+  @IsNumber()
+  conversionRate?: number;
 }
 
 export class CreatePurchaseDto {

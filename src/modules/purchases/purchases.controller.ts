@@ -26,20 +26,20 @@ export class PurchasesController {
 
   @ApiOperation({ summary: "Get a purchase by id" })
   @Get(":id")
-  findOne(@Param("id") id: any) {
-    return this.purchasesService.findOne(BigInt(id));
+  findOne(@Param("id") id: string) {
+    return this.purchasesService.findOne(id);
   }
 
   @ApiOperation({ summary: "Update a purchase by id" })
   @Put(":id")
   @Patch(":id")
-  update(@Param("id") id: any, @Body() updatePurchaseDto: UpdatePurchaseDto) {
-    return this.purchasesService.update(BigInt(id), updatePurchaseDto);
+  update(@Param("id") id: string, @Body() updatePurchaseDto: UpdatePurchaseDto) {
+    return this.purchasesService.update(id, updatePurchaseDto);
   }
 
   @ApiOperation({ summary: "Delete a purchase by id" })
   @Delete(":id")
-  remove(@Param("id") id: any) {
-    return this.purchasesService.remove(BigInt(id));
+  remove(@Param("id") id: string) {
+    return this.purchasesService.remove(id);
   }
 }

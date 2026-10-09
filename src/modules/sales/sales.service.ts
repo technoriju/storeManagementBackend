@@ -10,7 +10,7 @@ export class SalesService {
   async create(createSaleDto: CreateSaleDto) {
     const { items, paymentAmount, paymentMethod, ...saleData } = createSaleDto;
 
-    return this.prisma.$transaction(async (tx) => {
+    const created = await this.prisma.$transaction(async (tx) => {
       // 1. Resolve product units and quantities
       const resolvedItems: any[] = [];
       for (const item of items) {
@@ -21,34 +21,84 @@ export class SalesService {
         });
         if (!product) throw new NotFoundException(`Product ${item.productId} not found`);
 
-        let puId = item.productUnitId ? BigInt(item.productUnitId) : null;
-        let pu = puId ? await tx.productUnit.findUnique({ where: { id: puId } }) : null;
-
-        if (!pu) {
-          if (product.defaultSalesUnitId) {
-            pu = await tx.productUnit.findUnique({ where: { id: product.defaultSalesUnitId } });
-          } else if (product.productUnits && product.productUnits.length > 0) {
-            pu = product.productUnits[0];
-          } else {
-            pu = await tx.productUnit.create({
-              data: {
-                productId: product.id,
-                unitId: product.baseUnitId,
-                conversionFactor: 1,
-              },
-            });
+        let targetFactor = 1;
+          if ((item as any).unitType === 'base') {
+            targetFactor = Number((item as any).conversionRate || 1);
+          } else if ((item as any).unitType === 'sub') {
+            targetFactor = 1;
           }
-          puId = pu.id;
-        }
 
-        const conversionFactor = Number(pu.conversionFactor || 1);
-        const baseQuantity = item.quantity * conversionFactor;
+          let puId = item.productUnitId ? BigInt(item.productUnitId) : null;
+          let pu = puId ? await tx.productUnit.findUnique({ where: { id: puId } }) : null;
+
+          if (!pu && (item as any).unitType) {
+            // Find or create product unit that matches targetFactor
+            pu = product.productUnits?.find(u => Number(u.conversionFactor) === targetFactor)
+              || product.productUnits?.find(u => u.unitId === (product.baseUnitId || 1))
+              || (product.productUnits && product.productUnits.length > 0 ? product.productUnits[0] : null);
+            if (!pu) {
+              const targetUnitId = product.baseUnitId || 1;
+              const existingUnit = await tx.productUnit.findFirst({
+                where: { productId: product.id, unitId: targetUnitId },
+              });
+              if (existingUnit) {
+                pu = existingUnit;
+              } else {
+                try {
+                  pu = await tx.productUnit.create({
+                    data: {
+                      productId: product.id,
+                      unitId: targetUnitId,
+                      conversionFactor: targetFactor,
+                    },
+                  });
+                } catch {
+                  pu = await tx.productUnit.findFirst({
+                    where: { productId: product.id, unitId: targetUnitId },
+                  });
+                }
+              }
+            }
+            puId = pu ? pu.id : null;
+          } else if (!pu) {
+            if (product.defaultSalesUnitId) {
+              pu = await tx.productUnit.findUnique({ where: { id: product.defaultSalesUnitId } });
+            } else if (product.productUnits && product.productUnits.length > 0) {
+              pu = product.productUnits[0];
+            } else {
+              const targetUnitId = product.baseUnitId || 1;
+              const existingUnit = await tx.productUnit.findFirst({
+                where: { productId: product.id, unitId: targetUnitId },
+              });
+              if (existingUnit) {
+                pu = existingUnit;
+              } else {
+                try {
+                  pu = await tx.productUnit.create({
+                    data: {
+                      productId: product.id,
+                      unitId: targetUnitId,
+                      conversionFactor: 1,
+                    },
+                  });
+                } catch {
+                  pu = await tx.productUnit.findFirst({
+                    where: { productId: product.id, unitId: targetUnitId },
+                  });
+                }
+              }
+            }
+            puId = pu ? pu.id : null;
+          }
+
+          const conversionFactor = pu ? Number(pu.conversionFactor || 1) : targetFactor;
+          const baseQuantity = Number(item.quantity) * conversionFactor;
 
         resolvedItems.push({
           ...item,
           productId: prodId,
           productUnitId: puId,
-          unitId: pu.unitId,
+          unitId: pu?.unitId ?? (product.baseUnitId || 1),
           baseQuantity,
         });
       }
@@ -63,6 +113,9 @@ export class SalesService {
           const defaultWh = await tx.warehouse.findFirst();
           resolvedWarehouseId = defaultWh ? defaultWh.id : null;
         }
+      } else {
+        const defaultWh = await tx.warehouse.findFirst();
+        resolvedWarehouseId = defaultWh ? defaultWh.id : null;
       }
 
       let resolvedBranchId: number | null = null;
@@ -165,6 +218,15 @@ export class SalesService {
             },
           });
         }
+
+        for (const item of resolvedItems) {
+          try {
+            await tx.product.update({
+              where: { id: item.productId },
+              data: { version: { increment: 1 }, updatedAt: new Date() },
+            });
+          } catch (_) {}
+        }
       }
 
       // 5. Handle Payment
@@ -190,43 +252,135 @@ export class SalesService {
 
       return sale;
     });
+
+    try {
+      return await this.findOne(created.id);
+    } catch (_) {
+      return this.formatSale(created);
+    }
+  }
+
+  private readonly saleInclude = {
+    customer: true,
+    warehouse: true,
+    branch: true,
+    items: {
+      include: {
+        product: {
+          include: {
+            baseUnit: true,
+            subUnit: true,
+            brand: true,
+            category: true,
+            subCategory: true,
+          },
+        },
+        productUnit: {
+          include: {
+            unit: true,
+          },
+        },
+      },
+    },
+    payments: { include: { payment: true } },
+  };
+
+  private formatSale(sale: any) {
+    if (!sale) return sale;
+    if (!sale.items || !Array.isArray(sale.items)) return sale;
+
+    const formattedItems = sale.items.map((item: any) => {
+      if (!item.product) return item;
+      const prod = item.product;
+      const unitName = prod.baseUnit?.name ?? null;
+      const brandName = prod.brand?.name ?? null;
+      const subUnitName = prod.subUnit?.name ?? null;
+      const categoryName = prod.category?.name ?? null;
+      const subCategoryName = prod.subCategory?.name ?? null;
+
+      return {
+        ...item,
+        unitName: item.unitName ?? (item.productUnit?.unit?.name || unitName),
+        unit: item.unit ?? (item.productUnit?.unit?.name || unitName),
+        baseUnitName: unitName,
+        brandName: item.brandName ?? brandName,
+        subUnitName: item.subUnitName ?? subUnitName,
+        conversionRate: item.conversionRate !== undefined ? Number(item.conversionRate) : (prod.conversionRate ? Number(prod.conversionRate) : (item.productUnit?.conversionFactor ? Number(item.productUnit.conversionFactor) : undefined)),
+        product: {
+          ...prod,
+          unitName,
+          baseUnitName: unitName,
+          brandName,
+          subUnitName,
+          categoryName,
+          subCategoryName,
+        },
+      };
+    });
+
+    return {
+      ...sale,
+      items: formattedItems,
+    };
   }
 
   async findAll() {
-    return this.prisma.sale.findMany({
+    const sales = await this.prisma.sale.findMany({
       where: { deletedAt: null },
-      include: {
-        customer: true,
-        warehouse: true,
-        branch: true,
-        items: { include: { product: true } },
-        payments: { include: { payment: true } },
-      },
+      include: this.saleInclude,
       orderBy: { id: 'desc' },
     });
+    return sales.map((sale) => this.formatSale(sale));
   }
 
   async findOne(id: any) {
+    let saleId: bigint | null = null;
+    try {
+      if (typeof id === "bigint") {
+        saleId = id;
+      } else if (/^\d+$/.test(String(id).trim())) {
+        saleId = BigInt(String(id).trim());
+      }
+    } catch (_) {}
+
+    const idStr = String(id).trim();
     const item = await this.prisma.sale.findFirst({
-      where: { id, deletedAt: null },
-      include: {
-        customer: true,
-        warehouse: true,
-        branch: true,
-        items: { include: { product: true } },
-        payments: { include: { payment: true } },
+      where: {
+        deletedAt: null,
+        OR: [
+          ...(saleId !== null ? [{ id: saleId }] : []),
+          { invoiceNumber: idStr },
+        ],
       },
+      include: this.saleInclude,
     });
     if (!item) {
       throw new NotFoundException("Sale not found");
     }
-    return item;
+    return this.formatSale(item);
   }
 
   async update(id: any, updateSaleDto: UpdateSaleDto) {
-    const saleId = BigInt(id);
+    let saleId: bigint | null = null;
+    try {
+      if (typeof id === "bigint") {
+        saleId = id;
+      } else if (/^\d+$/.test(String(id).trim())) {
+        saleId = BigInt(String(id).trim());
+      }
+    } catch (_) {}
+
+    const idStr = String(id).trim();
+    const invNum = updateSaleDto.invoiceNumber ? String(updateSaleDto.invoiceNumber).trim() : null;
     const existing = await this.prisma.sale.findFirst({
-      where: { id: saleId, deletedAt: null },
+      where: {
+        deletedAt: null,
+        OR: [
+          ...(saleId !== null ? [{ id: saleId }] : []),
+          { invoiceNumber: idStr },
+          ...(invNum ? [{ invoiceNumber: invNum }] : []),
+        ],
+      },
       include: {
         items: {
           include: {
@@ -238,13 +392,24 @@ export class SalesService {
     if (!existing) {
       throw new NotFoundException("Sale not found");
     }
+    const targetSaleId = existing.id;
 
     const { items, paymentAmount, paymentMethod, ...saleData } = updateSaleDto;
 
     return this.prisma.$transaction(async (tx) => {
-      const warehouseId = saleData.warehouseId !== undefined
-        ? (saleData.warehouseId ? Number(saleData.warehouseId) : null)
-        : existing.warehouseId;
+      let resolvedWarehouseId: number | null = null;
+      if (saleData.warehouseId) {
+        const wh = await tx.warehouse.findUnique({ where: { id: Number(saleData.warehouseId) } });
+        resolvedWarehouseId = wh ? wh.id : null;
+      }
+      if (!resolvedWarehouseId && existing.warehouseId) {
+        resolvedWarehouseId = existing.warehouseId;
+      }
+      if (!resolvedWarehouseId) {
+        const defaultWh = await tx.warehouse.findFirst();
+        resolvedWarehouseId = defaultWh ? defaultWh.id : null;
+      }
+      const oldWarehouseId = existing.warehouseId || resolvedWarehouseId;
 
       if (items && Array.isArray(items)) {
         const resolvedItems: any[] = [];
@@ -256,49 +421,112 @@ export class SalesService {
           });
           if (!product) throw new NotFoundException(`Product ${item.productId} not found`);
 
+          let targetFactor = 1;
+          if ((item as any).unitType === 'base') {
+            targetFactor = Number((item as any).conversionRate || 1);
+          } else if ((item as any).unitType === 'sub') {
+            targetFactor = 1;
+          }
+
           let puId = item.productUnitId ? BigInt(item.productUnitId) : null;
           let pu = puId ? await tx.productUnit.findUnique({ where: { id: puId } }) : null;
 
-          if (!pu) {
+          if (!pu && (item as any).unitType) {
+            // Find or create product unit that matches targetFactor
+            pu = product.productUnits?.find(u => Number(u.conversionFactor) === targetFactor)
+              || product.productUnits?.find(u => u.unitId === (product.baseUnitId || 1))
+              || (product.productUnits && product.productUnits.length > 0 ? product.productUnits[0] : null);
+            if (!pu) {
+              const targetUnitId = product.baseUnitId || 1;
+              const existingUnit = await tx.productUnit.findFirst({
+                where: { productId: product.id, unitId: targetUnitId },
+              });
+              if (existingUnit) {
+                pu = existingUnit;
+              } else {
+                try {
+                  pu = await tx.productUnit.create({
+                    data: {
+                      productId: product.id,
+                      unitId: targetUnitId,
+                      conversionFactor: targetFactor,
+                    },
+                  });
+                } catch {
+                  pu = await tx.productUnit.findFirst({
+                    where: { productId: product.id, unitId: targetUnitId },
+                  });
+                }
+              }
+            }
+            puId = pu ? pu.id : null;
+          } else if (!pu) {
             if (product.defaultSalesUnitId) {
               pu = await tx.productUnit.findUnique({ where: { id: product.defaultSalesUnitId } });
             } else if (product.productUnits && product.productUnits.length > 0) {
               pu = product.productUnits[0];
             } else {
-              pu = await tx.productUnit.create({
-                data: {
-                  productId: product.id,
-                  unitId: product.baseUnitId,
-                  conversionFactor: 1,
-                },
+              const targetUnitId = product.baseUnitId || 1;
+              const existingUnit = await tx.productUnit.findFirst({
+                where: { productId: product.id, unitId: targetUnitId },
               });
+              if (existingUnit) {
+                pu = existingUnit;
+              } else {
+                try {
+                  pu = await tx.productUnit.create({
+                    data: {
+                      productId: product.id,
+                      unitId: targetUnitId,
+                      conversionFactor: 1,
+                    },
+                  });
+                } catch {
+                  pu = await tx.productUnit.findFirst({
+                    where: { productId: product.id, unitId: targetUnitId },
+                  });
+                }
+              }
             }
-            puId = pu.id;
+            puId = pu ? pu.id : null;
           }
 
-          const conversionFactor = Number(pu.conversionFactor || 1);
+          const conversionFactor = pu ? Number(pu.conversionFactor || 1) : targetFactor;
           const baseQuantity = Number(item.quantity) * conversionFactor;
 
           resolvedItems.push({
             ...item,
             productId: prodId,
             productUnitId: puId,
-            unitId: pu.unitId,
+            unitId: pu?.unitId ?? (product.baseUnitId || 1),
             baseQuantity,
           });
         }
 
-        // 1. Reverse stock of old items
-        if (existing.warehouseId && existing.items) {
+        // Status checks for stock adjustment
+        const oldStatus = String(existing.status || 'COMPLETED').toUpperCase();
+        const isOldStocked = oldStatus === 'COMPLETED' || oldStatus === 'RECEIVED';
+
+        const newStatus = String(saleData.status || existing.status || 'COMPLETED').toUpperCase();
+        const isNewStocked = newStatus === 'COMPLETED' || newStatus === 'RECEIVED';
+
+        // 1. Reverse stock of old items (add back what previous sale deducted)
+        if (isOldStocked && oldWarehouseId && existing.items) {
           for (const oldItem of existing.items) {
-            const oldConv = oldItem.productUnit?.conversionFactor ? Number(oldItem.productUnit.conversionFactor) : 1;
+            let oldConv = 1;
+            if (oldItem.productUnit?.conversionFactor) {
+              oldConv = Number(oldItem.productUnit.conversionFactor);
+            } else if (oldItem.productUnitId) {
+              const pu = await tx.productUnit.findUnique({ where: { id: oldItem.productUnitId } });
+              if (pu?.conversionFactor) oldConv = Number(pu.conversionFactor);
+            }
             const oldBaseQty = Number(oldItem.quantity) * oldConv;
 
             const existingStock = await tx.stockBalance.findUnique({
               where: {
                 productId_warehouseId: {
                   productId: oldItem.productId,
-                  warehouseId: existing.warehouseId,
+                  warehouseId: oldWarehouseId,
                 },
               },
             });
@@ -312,7 +540,7 @@ export class SalesService {
               await tx.stockBalance.create({
                 data: {
                   productId: oldItem.productId,
-                  warehouseId: existing.warehouseId,
+                  warehouseId: oldWarehouseId,
                   quantity: oldBaseQty,
                 },
               });
@@ -321,13 +549,13 @@ export class SalesService {
         }
 
         // 2. Deduct stock for new items
-        if (warehouseId) {
+        if (isNewStocked && resolvedWarehouseId) {
           for (const newItem of resolvedItems) {
             const existingStock = await tx.stockBalance.findUnique({
               where: {
                 productId_warehouseId: {
                   productId: newItem.productId,
-                  warehouseId: warehouseId,
+                  warehouseId: resolvedWarehouseId,
                 },
               },
             });
@@ -341,7 +569,7 @@ export class SalesService {
               await tx.stockBalance.create({
                 data: {
                   productId: newItem.productId,
-                  warehouseId: warehouseId,
+                  warehouseId: resolvedWarehouseId,
                   quantity: -newItem.baseQuantity,
                 },
               });
@@ -350,7 +578,7 @@ export class SalesService {
             await tx.stockTransaction.create({
               data: {
                 productId: newItem.productId,
-                warehouseId: warehouseId,
+                warehouseId: resolvedWarehouseId,
                 transactionType: "SALE_UPDATE",
                 referenceId: `SALE-${existing.id}`,
                 unitId: newItem.unitId,
@@ -361,14 +589,27 @@ export class SalesService {
           }
         }
 
-        // 3. Replace sale items
+        // 3. Bump version and updatedAt for all affected products
+        const affectedProductIds = new Set<bigint>();
+        existing.items?.forEach((i) => affectedProductIds.add(i.productId));
+        resolvedItems.forEach((i) => affectedProductIds.add(i.productId));
+        for (const pId of affectedProductIds) {
+          try {
+            await tx.product.update({
+              where: { id: pId },
+              data: { version: { increment: 1 }, updatedAt: new Date() },
+            });
+          } catch (_) {}
+        }
+
+        // 4. Replace sale items
         await tx.saleItem.deleteMany({
-          where: { saleId },
+          where: { saleId: targetSaleId },
         });
 
         await tx.saleItem.createMany({
           data: resolvedItems.map((item) => ({
-            saleId,
+            saleId: targetSaleId,
             productId: item.productId,
             productUnitId: item.productUnitId,
             quantity: Number(item.quantity),
@@ -380,7 +621,7 @@ export class SalesService {
         });
       }
 
-      // 4. Update sale fields
+      // 5. Update sale fields
       const updateData: any = {};
       if (saleData.subTotal !== undefined) updateData.subTotal = Number(saleData.subTotal);
       if (saleData.taxTotal !== undefined) updateData.taxTotal = Number(saleData.taxTotal);
@@ -394,31 +635,50 @@ export class SalesService {
       if (saleData.previousDue !== undefined) updateData.previousDue = Number(saleData.previousDue);
       if (saleData.advancePayment !== undefined) updateData.advancePayment = Number(saleData.advancePayment);
       if (saleData.showPreviousBalance !== undefined) updateData.showPreviousBalance = Boolean(saleData.showPreviousBalance);
-      if (saleData.warehouseId !== undefined) updateData.warehouseId = warehouseId;
-      if (saleData.branchId !== undefined) updateData.branchId = saleData.branchId ? Number(saleData.branchId) : null;
-      if (saleData.customerId !== undefined) updateData.customerId = saleData.customerId ? Number(saleData.customerId) : null;
+      if (saleData.warehouseId !== undefined) updateData.warehouseId = resolvedWarehouseId;
+      if (saleData.branchId !== undefined) {
+        let bId: number | null = null;
+        if (saleData.branchId) {
+          const br = await tx.branch.findUnique({ where: { id: Number(saleData.branchId) } });
+          bId = br ? br.id : null;
+        }
+        updateData.branchId = bId;
+      }
+      if (saleData.customerId !== undefined) {
+        let cId: number | null = null;
+        if (saleData.customerId) {
+          const cust = await tx.customer.findUnique({ where: { id: Number(saleData.customerId) } });
+          cId = cust ? cust.id : null;
+        }
+        updateData.customerId = cId;
+      }
       if (saleData.saleDate !== undefined) updateData.saleDate = new Date(saleData.saleDate);
 
       const updated = await tx.sale.update({
-        where: { id: saleId },
+        where: { id: targetSaleId },
         data: updateData,
-        include: {
-          items: { include: { product: true } },
-          customer: true,
-          warehouse: true,
-          branch: true,
-          payments: { include: { payment: true } },
-        },
+        include: this.saleInclude,
       });
 
-      return updated;
+      return this.formatSale(updated);
     });
   }
 
   async remove(id: any) {
-    const saleId = BigInt(id);
+    let saleId: bigint | null = null;
+    try {
+      if (typeof id === "bigint") {
+        saleId = id;
+      } else if (/^\d+$/.test(String(id).trim())) {
+        saleId = BigInt(String(id).trim());
+      }
+    } catch (_) {}
+
+    const idStr = String(id).trim();
     const existing = await this.prisma.sale.findFirst({
-      where: { id: saleId, deletedAt: null },
+      where: saleId !== null
+        ? { id: saleId, deletedAt: null }
+        : { invoiceNumber: idStr, deletedAt: null },
       include: {
         items: {
           include: {
@@ -432,9 +692,16 @@ export class SalesService {
     }
 
     return this.prisma.$transaction(async (tx) => {
-      // 1. Restore Stock if warehouse was associated
-      if (existing.warehouseId && existing.items && existing.items.length > 0) {
-        for (const item of existing.items) {
+      // 1. Restore Stock (fallback to default warehouse if not specified on sale)
+      let targetWarehouseId = existing.warehouseId;
+      if (!targetWarehouseId) {
+        const defaultWh = await tx.warehouse.findFirst({ where: { deletedAt: null } }) || (await tx.warehouse.findFirst());
+        targetWarehouseId = defaultWh ? defaultWh.id : null;
+      }
+
+      const existingItems: any[] = (existing as any).items || [];
+      if (targetWarehouseId && existingItems.length > 0) {
+        for (const item of existingItems) {
           const convFactor = item.productUnit?.conversionFactor ? Number(item.productUnit.conversionFactor) : 1;
           const baseQty = Number(item.quantity) * convFactor;
 
@@ -442,7 +709,7 @@ export class SalesService {
             where: {
               productId_warehouseId: {
                 productId: item.productId,
-                warehouseId: existing.warehouseId,
+                warehouseId: targetWarehouseId,
               },
             },
           });
@@ -456,7 +723,7 @@ export class SalesService {
             await tx.stockBalance.create({
               data: {
                 productId: item.productId,
-                warehouseId: existing.warehouseId,
+                warehouseId: targetWarehouseId,
                 quantity: baseQty,
               },
             });
@@ -466,11 +733,11 @@ export class SalesService {
           await tx.stockTransaction.create({
             data: {
               productId: item.productId,
-              warehouseId: existing.warehouseId,
+              warehouseId: targetWarehouseId,
               transactionType: "SALE_CANCELLED",
               referenceId: `SALE-${existing.id}`,
               unitId: item.productUnit?.unitId ?? null,
-              unitQuantity: item.quantity,
+              unitQuantity: Number(item.quantity),
               baseQuantity: baseQty,
             },
           });
@@ -478,16 +745,33 @@ export class SalesService {
       }
 
       // 2. Mark items soft-deleted
-      await tx.saleItem.updateMany({
-        where: { saleId },
+      if (tx.saleItem?.updateMany) {
+        await tx.saleItem.updateMany({
+          where: { saleId: existing.id },
+          data: { deletedAt: new Date() },
+        });
+      }
+
+      // 3. Mark sale payments soft-deleted
+      if (tx.salePayment?.updateMany) {
+        await tx.salePayment.updateMany({
+          where: { saleId: existing.id },
+          data: { deletedAt: new Date() },
+        });
+      }
+
+      // 4. Mark sale soft-deleted
+      await tx.sale.update({
+        where: { id: existing.id },
         data: { deletedAt: new Date() },
       });
 
-      // 3. Mark sale soft-deleted
-      return tx.sale.update({
-        where: { id: saleId },
-        data: { deletedAt: new Date() },
-      });
+      return {
+        success: true,
+        message: "Sale deleted successfully",
+        id: existing.id.toString(),
+        invoiceNumber: existing.invoiceNumber,
+      };
     });
   }
 }

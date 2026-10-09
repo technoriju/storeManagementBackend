@@ -7,6 +7,13 @@ import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
 import { TransformInterceptor } from "./common/interceptors/transform.interceptor";
 import { ConfigService } from "@nestjs/config";
 
+process.on("uncaughtException", (err) => {
+  console.error("[UNCAUGHT EXCEPTION]", err);
+});
+process.on("unhandledRejection", (reason) => {
+  console.error("[UNHANDLED REJECTION]", reason);
+});
+
 (BigInt.prototype as any).toJSON = function () {
   return this.toString();
 };
@@ -34,7 +41,7 @@ async function bootstrap() {
     new ValidationPipe({
       whitelist: true,
       transform: true,
-      forbidNonWhitelisted: true,
+      forbidNonWhitelisted: false,
       transformOptions: {
         enableImplicitConversion: true,
       },

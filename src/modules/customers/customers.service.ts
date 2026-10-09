@@ -51,22 +51,54 @@ export class CustomersService {
   }
 
   async findAll() {
-    return this.prisma.customer.findMany({
+    const customers = await this.prisma.customer.findMany({
       where: { deletedAt: null },
+      include: {
+        sales: {
+          where: { deletedAt: null },
+          select: { due: true, paid: true, grandTotal: true },
+        },
+      },
       orderBy: { id: 'desc' },
+    });
+
+    return customers.map((c) => {
+      const { sales, ...rest } = c;
+      const outstandingBalance = (sales || []).reduce(
+        (sum, s) => sum + Number(s.due || 0),
+        0
+      );
+      return {
+        ...rest,
+        outstandingBalance,
+      };
     });
   }
 
   async findOne(id: number) {
     const item = await this.prisma.customer.findFirst({
       where: { id, deletedAt: null },
+      include: {
+        sales: {
+          where: { deletedAt: null },
+          select: { due: true, paid: true, grandTotal: true },
+        },
+      },
     });
 
     if (!item) {
       throw new NotFoundException(`Customer with ID ${id} not found`);
     }
 
-    return item;
+    const { sales, ...rest } = item;
+    const outstandingBalance = (sales || []).reduce(
+      (sum, s) => sum + Number(s.due || 0),
+      0
+    );
+    return {
+      ...rest,
+      outstandingBalance,
+    };
   }
 
   async update(id: number, updateCustomerDto: UpdateCustomerDto) {

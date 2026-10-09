@@ -205,4 +205,58 @@ describe("SalesService - Delete and Update Stock Adjustments", () => {
       expect(mockTx.saleItem.createMany).toHaveBeenCalled();
     });
   });
+
+  describe("findAll & findOne (Product enrichment)", () => {
+    const mockSaleWithProduct = {
+      id: 10n,
+      invoiceNumber: "INV-1001",
+      deletedAt: null,
+      items: [
+        {
+          id: 1n,
+          productId: 18n,
+          quantity: 2,
+          unitPrice: 130,
+          total: 260,
+          product: {
+            id: 18n,
+            name: "250ML CONTANERhfhh",
+            baseUnitId: 1,
+            subUnitId: 2,
+            brandId: 4,
+            categoryId: 5,
+            baseUnit: { id: 1, name: "Piece", shortName: "pcs" },
+            subUnit: { id: 2, name: "Box", multiplier: 50 },
+            brand: { id: 4, name: "PlasticCo" },
+            category: { id: 5, name: "Containers" },
+          },
+        },
+      ],
+    };
+
+    it("should enrich product with unitName, baseUnitName, brandName, subUnitName, and categoryName on findAll", async () => {
+      mockPrisma.sale.findMany.mockResolvedValue([mockSaleWithProduct]);
+
+      const result = await service.findAll();
+
+      expect(result).toHaveLength(1);
+      const product = result[0].items[0].product;
+      expect(product.unitName).toBe("Piece");
+      expect(product.baseUnitName).toBe("Piece");
+      expect(product.brandName).toBe("PlasticCo");
+      expect(product.subUnitName).toBe("Box");
+      expect(product.categoryName).toBe("Containers");
+    });
+
+    it("should enrich product with unitName, baseUnitName, brandName, subUnitName on findOne", async () => {
+      mockPrisma.sale.findFirst.mockResolvedValue(mockSaleWithProduct);
+
+      const result = await service.findOne("INV-1001");
+
+      const product = result.items[0].product;
+      expect(product.unitName).toBe("Piece");
+      expect(product.brandName).toBe("PlasticCo");
+      expect(product.subUnitName).toBe("Box");
+    });
+  });
 });
