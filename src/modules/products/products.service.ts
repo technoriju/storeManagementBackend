@@ -871,8 +871,11 @@ export class ProductsService {
         wholesalePrice: p.wholesalePrice !== null && p.wholesalePrice !== undefined ? Number(p.wholesalePrice) : 0,
         retailPrice: p.retailPrice !== null && p.retailPrice !== undefined ? Number(p.retailPrice) : 0,
         stockQuantity,
-        categoryName: p.category?.name ?? null,
+        unitName: p.baseUnit?.name ?? null,
+        baseUnitName: p.baseUnit?.name ?? null,
         brandName: p.brand?.name ?? null,
+        subUnitName: p.subUnit?.name ?? null,
+        categoryName: p.category?.name ?? null,
       };
     });
   }
@@ -906,8 +909,11 @@ export class ProductsService {
       wholesalePrice: item.wholesalePrice !== null && item.wholesalePrice !== undefined ? Number(item.wholesalePrice) : 0,
       retailPrice: item.retailPrice !== null && item.retailPrice !== undefined ? Number(item.retailPrice) : 0,
       stockQuantity,
-      categoryName: item.category?.name ?? null,
+      unitName: item.baseUnit?.name ?? null,
+      baseUnitName: item.baseUnit?.name ?? null,
       brandName: item.brand?.name ?? null,
+      subUnitName: item.subUnit?.name ?? null,
+      categoryName: item.category?.name ?? null,
     };
   }
 

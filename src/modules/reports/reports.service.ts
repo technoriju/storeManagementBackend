@@ -120,22 +120,27 @@ export class ReportsService {
         0,
       );
       const grandTotal = this.toNumber(sale.grandTotal);
+      const dueAmount = Number((grandTotal - paidAmount).toFixed(2));
+      const paymentStatus =
+        dueAmount <= 0 ? "Paid" : paidAmount > 0 ? "Partial" : "Unpaid";
       return {
         id: sale.id,
         invoiceNumber: sale.invoiceNumber,
         saleDate: sale.saleDate,
         customerName: sale.customer?.name || "Walk-in Customer",
         customerPhone: sale.customer?.phone || "",
+        customerId: sale.customer?.id || sale.customerId || null,
         branchName: sale.branch?.name || "",
         warehouseName: sale.warehouse?.name || "",
         itemCount: sale._count.items,
         status: sale.status,
+        paymentStatus,
         subTotal: this.toNumber(sale.subTotal),
         taxTotal: this.toNumber(sale.taxTotal),
         discountTotal: this.toNumber(sale.discountTotal),
         grandTotal,
         paidAmount,
-        dueAmount: Number((grandTotal - paidAmount).toFixed(2)),
+        dueAmount,
       };
     });
 
@@ -226,22 +231,27 @@ export class ReportsService {
         0,
       );
       const grandTotal = this.toNumber(purchase.grandTotal);
+      const dueAmount = Number((grandTotal - paidAmount).toFixed(2));
+      const paymentStatus =
+        dueAmount <= 0 ? "Paid" : paidAmount > 0 ? "Partial" : "Unpaid";
       return {
         id: purchase.id,
         invoiceNumber: purchase.invoiceNumber,
         purchaseDate: purchase.purchaseDate,
-        supplierName: purchase.supplier?.name || "",
+        supplierName: purchase.supplier?.name || "Supplier",
         supplierPhone: purchase.supplier?.phone || "",
+        supplierId: purchase.supplier?.id || purchase.supplierId || null,
         branchName: purchase.branch?.name || "",
         warehouseName: purchase.warehouse?.name || "",
         itemCount: purchase._count.items,
         status: purchase.status,
+        paymentStatus,
         subTotal: this.toNumber(purchase.subTotal),
         taxTotal: this.toNumber(purchase.taxTotal),
         discountTotal: this.toNumber(purchase.discountTotal),
         grandTotal,
         paidAmount,
-        dueAmount: Number((grandTotal - paidAmount).toFixed(2)),
+        dueAmount,
       };
     });
 
@@ -488,14 +498,26 @@ export class ReportsService {
         ? `${quantity} ${baseUnitName} (${subUnitQuantity} ${subUnitName})`
         : `${quantity} ${baseUnitName}`;
 
+      const lowThreshold = b.product.lowStockLevel
+        ? this.toNumber(b.product.lowStockLevel, 4)
+        : 5;
+      const status =
+        quantity <= 0
+          ? "OUT_OF_STOCK"
+          : quantity <= lowThreshold
+          ? "LOW_STOCK"
+          : "IN_STOCK";
+
       return {
         id: b.id,
         productId: b.productId,
         productCode: b.product.productCode,
         productName: b.product.name,
         sku: b.product.sku,
-        category: b.product.category?.name || "",
+        category: b.product.category?.name || "General",
+        categoryName: b.product.category?.name || "General",
         brand: b.product.brand?.name || "",
+        brandName: b.product.brand?.name || "",
         warehouseName: b.warehouse.name,
         quantity,
         unit: baseUnitName,
@@ -505,6 +527,7 @@ export class ReportsService {
         formattedStock,
         unitCost,
         stockValue,
+        status,
         lowStockLevel: b.product.lowStockLevel
           ? this.toNumber(b.product.lowStockLevel, 4)
           : null,

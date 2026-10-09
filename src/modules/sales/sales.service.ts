@@ -10,7 +10,7 @@ export class SalesService {
   async create(createSaleDto: CreateSaleDto) {
     const { items, paymentAmount, paymentMethod, ...saleData } = createSaleDto;
 
-    return this.prisma.$transaction(async (tx) => {
+    const created = await this.prisma.$transaction(async (tx) => {
       // 1. Resolve product units and quantities
       const resolvedItems: any[] = [];
       for (const item of items) {
@@ -252,20 +252,85 @@ export class SalesService {
 
       return sale;
     });
+
+    try {
+      return await this.findOne(created.id);
+    } catch (_) {
+      return this.formatSale(created);
+    }
+  }
+
+  private readonly saleInclude = {
+    customer: true,
+    warehouse: true,
+    branch: true,
+    items: {
+      include: {
+        product: {
+          include: {
+            baseUnit: true,
+            subUnit: true,
+            brand: true,
+            category: true,
+            subCategory: true,
+          },
+        },
+        productUnit: {
+          include: {
+            unit: true,
+          },
+        },
+      },
+    },
+    payments: { include: { payment: true } },
+  };
+
+  private formatSale(sale: any) {
+    if (!sale) return sale;
+    if (!sale.items || !Array.isArray(sale.items)) return sale;
+
+    const formattedItems = sale.items.map((item: any) => {
+      if (!item.product) return item;
+      const prod = item.product;
+      const unitName = prod.baseUnit?.name ?? null;
+      const brandName = prod.brand?.name ?? null;
+      const subUnitName = prod.subUnit?.name ?? null;
+      const categoryName = prod.category?.name ?? null;
+      const subCategoryName = prod.subCategory?.name ?? null;
+
+      return {
+        ...item,
+        unitName: item.unitName ?? (item.productUnit?.unit?.name || unitName),
+        unit: item.unit ?? (item.productUnit?.unit?.name || unitName),
+        baseUnitName: unitName,
+        brandName: item.brandName ?? brandName,
+        subUnitName: item.subUnitName ?? subUnitName,
+        conversionRate: item.conversionRate !== undefined ? Number(item.conversionRate) : (prod.conversionRate ? Number(prod.conversionRate) : (item.productUnit?.conversionFactor ? Number(item.productUnit.conversionFactor) : undefined)),
+        product: {
+          ...prod,
+          unitName,
+          baseUnitName: unitName,
+          brandName,
+          subUnitName,
+          categoryName,
+          subCategoryName,
+        },
+      };
+    });
+
+    return {
+      ...sale,
+      items: formattedItems,
+    };
   }
 
   async findAll() {
-    return this.prisma.sale.findMany({
+    const sales = await this.prisma.sale.findMany({
       where: { deletedAt: null },
-      include: {
-        customer: true,
-        warehouse: true,
-        branch: true,
-        items: { include: { product: true } },
-        payments: { include: { payment: true } },
-      },
+      include: this.saleInclude,
       orderBy: { id: 'desc' },
     });
+    return sales.map((sale) => this.formatSale(sale));
   }
 
   async findOne(id: any) {
@@ -287,18 +352,12 @@ export class SalesService {
           { invoiceNumber: idStr },
         ],
       },
-      include: {
-        customer: true,
-        warehouse: true,
-        branch: true,
-        items: { include: { product: true } },
-        payments: { include: { payment: true } },
-      },
+      include: this.saleInclude,
     });
     if (!item) {
       throw new NotFoundException("Sale not found");
     }
-    return item;
+    return this.formatSale(item);
   }
 
   async update(id: any, updateSaleDto: UpdateSaleDto) {
@@ -577,23 +636,31 @@ export class SalesService {
       if (saleData.advancePayment !== undefined) updateData.advancePayment = Number(saleData.advancePayment);
       if (saleData.showPreviousBalance !== undefined) updateData.showPreviousBalance = Boolean(saleData.showPreviousBalance);
       if (saleData.warehouseId !== undefined) updateData.warehouseId = resolvedWarehouseId;
-      if (saleData.branchId !== undefined) updateData.branchId = saleData.branchId ? Number(saleData.branchId) : null;
-      if (saleData.customerId !== undefined) updateData.customerId = saleData.customerId ? Number(saleData.customerId) : null;
+      if (saleData.branchId !== undefined) {
+        let bId: number | null = null;
+        if (saleData.branchId) {
+          const br = await tx.branch.findUnique({ where: { id: Number(saleData.branchId) } });
+          bId = br ? br.id : null;
+        }
+        updateData.branchId = bId;
+      }
+      if (saleData.customerId !== undefined) {
+        let cId: number | null = null;
+        if (saleData.customerId) {
+          const cust = await tx.customer.findUnique({ where: { id: Number(saleData.customerId) } });
+          cId = cust ? cust.id : null;
+        }
+        updateData.customerId = cId;
+      }
       if (saleData.saleDate !== undefined) updateData.saleDate = new Date(saleData.saleDate);
 
       const updated = await tx.sale.update({
         where: { id: targetSaleId },
         data: updateData,
-        include: {
-          items: { include: { product: true } },
-          customer: true,
-          warehouse: true,
-          branch: true,
-          payments: { include: { payment: true } },
-        },
+        include: this.saleInclude,
       });
 
-      return updated;
+      return this.formatSale(updated);
     });
   }
 
