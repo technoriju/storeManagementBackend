@@ -848,22 +848,51 @@ export class ProductsService {
     };
   }
 
-  async findAll() {
-    const products = await this.prisma.product.findMany({
-      where: { deletedAt: null },
-      include: {
-        baseUnit: true,
-        subUnit: true,
-        category: true,
-        subCategory: true,
-        brand: true,
-        productUnits: { include: { unit: true } },
-        stockBalances: true,
-      },
-      orderBy: { id: "desc" },
-    });
+  async findAll(query?: any) {
+    const where: Prisma.ProductWhereInput = { deletedAt: null };
 
-    return products.map((p) => {
+    if (query?.categoryId) {
+      where.categoryId = Number(query.categoryId);
+    }
+    if (query?.brandId) {
+      where.brandId = Number(query.brandId);
+    }
+    if (query?.search && String(query.search).trim()) {
+      const q = String(query.search).trim();
+      where.OR = [
+        { name: { contains: q } },
+        { sku: { contains: q } },
+        { productCode: { contains: q } },
+        { barcode: { contains: q } },
+        { category: { name: { contains: q } } },
+        { brand: { name: { contains: q } } },
+      ];
+    }
+
+    const hasPagination = query?.page !== undefined || query?.limit !== undefined;
+    const page = Math.max(1, Number(query?.page || 1));
+    const limit = Math.max(1, Number(query?.limit || 10));
+    const skip = (page - 1) * limit;
+
+    const [total, products] = await Promise.all([
+      hasPagination ? this.prisma.product.count({ where }) : Promise.resolve(0),
+      this.prisma.product.findMany({
+        where,
+        include: {
+          baseUnit: true,
+          subUnit: true,
+          category: true,
+          subCategory: true,
+          brand: true,
+          productUnits: { include: { unit: true } },
+          stockBalances: true,
+        },
+        orderBy: { id: "desc" },
+        ...(hasPagination ? { skip, take: limit } : {}),
+      }),
+    ]);
+
+    const mapped = products.map((p) => {
       const stockQuantity = p.stockBalances?.reduce((sum, b) => sum + Number(b.quantity || 0), 0) ?? 0;
       return {
         ...p,
@@ -878,6 +907,18 @@ export class ProductsService {
         categoryName: p.category?.name ?? null,
       };
     });
+
+    if (hasPagination) {
+      return {
+        data: mapped,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      };
+    }
+
+    return mapped;
   }
 
   async findOne(id: any) {
