@@ -73,7 +73,7 @@ import { PurchaseReturnsModule } from "./modules/purchase-returns/purchase-retur
     ThrottlerModule.forRoot([
       {
         ttl: 60000,
-        limit: 1000,
+        limit: 5000,
       },
     ]),
     SubCategoriesModule,
