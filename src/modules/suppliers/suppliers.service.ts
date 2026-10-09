@@ -8,21 +8,31 @@ export class SuppliersService {
   constructor(private readonly prisma: PrismaService) {}
 
   private calculateOutstanding(purchases: any[], payments: any[]): number {
-    const purchasesDue = (purchases || []).reduce(
-      (sum, p) => sum + Number(p.due || 0),
-      0
-    );
-    let unallocated = 0;
+    const totalPurchased = (purchases || []).reduce((sum, p) => {
+      const gt = Number(p.grandTotal || p.total || 0);
+      let returned = 0;
+      if (p.returns && Array.isArray(p.returns)) {
+        returned = p.returns.reduce(
+          (rSum: number, r: any) => rSum + Number(r.totalAmount || 0),
+          0
+        );
+      }
+      return sum + (gt - returned);
+    }, 0);
+
+    let totalPaid = 0;
+    let totalRefundReceived = 0;
     (payments || []).forEach((p) => {
       const amt = Number(p.amount || 0);
-      const t = (p.type || 'pay').toLowerCase();
-      if (t === 'pay' || t === 'paid') {
-        unallocated += amt;
-      } else if (t === 'receive' || t === 'received') {
-        unallocated -= amt;
+      const t = (p.type || "pay").toLowerCase();
+      if (t === "pay" || t === "paid") {
+        totalPaid += amt;
+      } else if (t === "receive" || t === "received") {
+        totalRefundReceived += amt;
       }
     });
-    return Number((purchasesDue - unallocated).toFixed(2));
+
+    return Number(((totalPurchased + totalRefundReceived) - totalPaid).toFixed(2));
   }
 
   async create(createSupplierDto: CreateSupplierDto) {
@@ -72,19 +82,23 @@ export class SuppliersService {
         payments: {
           where: {
             deletedAt: null,
-            purchasePayments: { none: {} },
           },
           select: { amount: true, type: true },
         },
         purchases: {
           where: {
             deletedAt: null,
-            NOT: { status: { in: ['cancelled', 'CANCELLED'] } },
+            NOT: { status: { in: ["cancelled", "CANCELLED"] } },
           },
-          select: { due: true, paid: true, grandTotal: true },
+          select: {
+            due: true,
+            paid: true,
+            grandTotal: true,
+            returns: { select: { totalAmount: true } },
+          },
         },
       },
-      orderBy: { id: 'desc' },
+      orderBy: { id: "desc" },
     });
 
     return suppliers.map((s) => {
@@ -103,16 +117,20 @@ export class SuppliersService {
         payments: {
           where: {
             deletedAt: null,
-            purchasePayments: { none: {} },
           },
           select: { amount: true, type: true },
         },
         purchases: {
           where: {
             deletedAt: null,
-            NOT: { status: { in: ['cancelled', 'CANCELLED'] } },
+            NOT: { status: { in: ["cancelled", "CANCELLED"] } },
           },
-          select: { due: true, paid: true, grandTotal: true },
+          select: {
+            due: true,
+            paid: true,
+            grandTotal: true,
+            returns: { select: { totalAmount: true } },
+          },
         },
       },
     });

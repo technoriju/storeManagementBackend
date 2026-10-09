@@ -52,21 +52,31 @@ export class CustomersService {
   }
 
   private calculateOutstanding(sales: any[], payments: any[]): number {
-    const salesDue = (sales || []).reduce(
-      (sum, s) => sum + Number(s.due || 0),
-      0
-    );
-    let unallocated = 0;
+    const totalBilled = (sales || []).reduce((sum, s) => {
+      const gt = Number(s.grandTotal || s.total || 0);
+      let returned = 0;
+      if (s.returns && Array.isArray(s.returns)) {
+        returned = s.returns.reduce(
+          (rSum: number, r: any) => rSum + Number(r.totalAmount || 0),
+          0
+        );
+      }
+      return sum + (gt - returned);
+    }, 0);
+
+    let totalReceived = 0;
+    let totalRefunded = 0;
     (payments || []).forEach((p) => {
       const amt = Number(p.amount || 0);
-      const t = (p.type || 'receive').toLowerCase();
-      if (t === 'receive' || t === 'received') {
-        unallocated += amt;
-      } else if (t === 'pay' || t === 'paid') {
-        unallocated -= amt;
+      const t = (p.type || "receive").toLowerCase();
+      if (t === "receive" || t === "received") {
+        totalReceived += amt;
+      } else if (t === "pay" || t === "paid") {
+        totalRefunded += amt;
       }
     });
-    return Number((salesDue - unallocated).toFixed(2));
+
+    return Number(((totalBilled + totalRefunded) - totalReceived).toFixed(2));
   }
 
   async findAll() {
@@ -76,19 +86,23 @@ export class CustomersService {
         payments: {
           where: {
             deletedAt: null,
-            salePayments: { none: {} },
           },
           select: { amount: true, type: true },
         },
         sales: {
           where: {
             deletedAt: null,
-            NOT: { status: { in: ['cancelled', 'CANCELLED'] } },
+            NOT: { status: { in: ["cancelled", "CANCELLED"] } },
           },
-          select: { due: true, paid: true, grandTotal: true },
+          select: {
+            due: true,
+            paid: true,
+            grandTotal: true,
+            returns: { select: { totalAmount: true } },
+          },
         },
       },
-      orderBy: { id: 'desc' },
+      orderBy: { id: "desc" },
     });
 
     return customers.map((c) => {
@@ -107,16 +121,20 @@ export class CustomersService {
         payments: {
           where: {
             deletedAt: null,
-            salePayments: { none: {} },
           },
           select: { amount: true, type: true },
         },
         sales: {
           where: {
             deletedAt: null,
-            NOT: { status: { in: ['cancelled', 'CANCELLED'] } },
+            NOT: { status: { in: ["cancelled", "CANCELLED"] } },
           },
-          select: { due: true, paid: true, grandTotal: true },
+          select: {
+            due: true,
+            paid: true,
+            grandTotal: true,
+            returns: { select: { totalAmount: true } },
+          },
         },
       },
     });

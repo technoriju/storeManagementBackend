@@ -8,7 +8,7 @@ export class PurchasesService {
   constructor(private prisma: PrismaService) {}
 
   async create(createPurchaseDto: CreatePurchaseDto) {
-    const { items, paymentAmount, paymentMethod, ...purchaseData } = createPurchaseDto;
+    const { items, paymentAmount, paymentMethod, advancePayment, showPreviousBalance, previousDue, ...purchaseData } = createPurchaseDto;
 
     return this.prisma.$transaction(async (tx) => {
       // 1. Resolve product units and quantities
@@ -216,24 +216,84 @@ export class PurchasesService {
         }
       }
 
-      // 5. Handle Payment
-      if (paymentAmount && paymentAmount > 0) {
+      // 5. Handle Supplier Advance Allocation & Payment
+      const advPaymentVal = advancePayment !== undefined ? Number(advancePayment) : 0;
+      const isAdvanceApplied = Boolean(showPreviousBalance && advPaymentVal > 0);
+      const advUsed = isAdvanceApplied ? Math.min(advPaymentVal, grandTotalNum) : 0;
+
+      let remainingAdvToAllocate = advUsed;
+      if (resolvedSupplierId && remainingAdvToAllocate > 0) {
+        const unallocatedPayments = await tx.payment.findMany({
+          where: {
+            supplierId: resolvedSupplierId,
+            deletedAt: null,
+            type: { in: ["pay", "paid"] },
+            purchasePayments: { none: {} },
+          },
+          orderBy: { id: "asc" },
+        });
+
+        for (const p of unallocatedPayments) {
+          if (remainingAdvToAllocate <= 0) break;
+          const pAmt = Number(p.amount);
+          if (pAmt <= remainingAdvToAllocate) {
+            await tx.purchasePayment.create({
+              data: {
+                purchaseId: purchase.id,
+                paymentId: p.id,
+              },
+            });
+            remainingAdvToAllocate = Number((remainingAdvToAllocate - pAmt).toFixed(2));
+          } else {
+            const consumed = remainingAdvToAllocate;
+            const remainder = Number((pAmt - consumed).toFixed(2));
+
+            await tx.payment.update({
+              where: { id: p.id },
+              data: { amount: consumed },
+            });
+            await tx.purchasePayment.create({
+              data: {
+                purchaseId: purchase.id,
+                paymentId: p.id,
+              },
+            });
+
+            await tx.payment.create({
+              data: {
+                paymentDate: p.paymentDate,
+                amount: remainder,
+                paymentMethod: p.paymentMethod,
+                referenceNumber: p.referenceNumber,
+                type: p.type,
+                notes: p.notes,
+                supplierId: resolvedSupplierId,
+              },
+            });
+
+            remainingAdvToAllocate = 0;
+          }
+        }
+      }
+
+      const validPayAmount = Math.max(0, Math.min(Number(paymentAmount || 0), Number(paidVal || 0)) - advUsed);
+      if (validPayAmount > 0) {
         const payment = await tx.payment.create({
           data: {
             paymentDate: new Date(),
-            amount: paymentAmount,
+            amount: validPayAmount,
             paymentMethod: paymentMethod || "CASH",
             referenceNumber: purchase.invoiceNumber,
             type: "pay",
             supplierId: resolvedSupplierId,
-          }
+          },
         });
 
         await tx.purchasePayment.create({
           data: {
             purchaseId: purchase.id,
-            paymentId: payment.id
-          }
+            paymentId: payment.id,
+          },
         });
       }
 
