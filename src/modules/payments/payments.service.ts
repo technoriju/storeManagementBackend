@@ -88,6 +88,8 @@ export class PaymentsService {
         });
 
         let remaining = Number(amount);
+        let firstSale = true;
+
         for (const sale of unpaidSales) {
           if (remaining <= 0) break;
           const sDue = Number(sale.due || 0);
@@ -108,14 +110,54 @@ export class PaymentsService {
             },
           });
 
-          await tx.salePayment.create({
-            data: {
-              saleId: sale.id,
-              paymentId: created.id,
-            },
-          });
+          if (firstSale) {
+            await tx.payment.update({
+              where: { id: created.id },
+              data: { amount: alloc },
+            });
+            await tx.salePayment.create({
+              data: {
+                saleId: sale.id,
+                paymentId: created.id,
+              },
+            });
+            firstSale = false;
+          } else {
+            const nextPayment = await tx.payment.create({
+              data: {
+                paymentDate: date,
+                amount: alloc,
+                paymentMethod: resolvedMethod,
+                referenceNumber: resolvedRef,
+                type: resolvedType,
+                notes: notes || null,
+                customerId: resolvedCustomerId,
+              },
+            });
+            await tx.salePayment.create({
+              data: {
+                saleId: sale.id,
+                paymentId: nextPayment.id,
+              },
+            });
+          }
 
           remaining = Number((remaining - alloc).toFixed(2));
+        }
+
+        // If unpaid sales were satisfied and remaining > 0, create unallocated payment for advance
+        if (remaining > 0 && !firstSale) {
+          await tx.payment.create({
+            data: {
+              paymentDate: date,
+              amount: remaining,
+              paymentMethod: resolvedMethod,
+              referenceNumber: resolvedRef,
+              type: resolvedType,
+              notes: notes ? `${notes} (Advance Credit)` : "Advance Credit",
+              customerId: resolvedCustomerId,
+            },
+          });
         }
       }
 
@@ -132,6 +174,8 @@ export class PaymentsService {
         });
 
         let remaining = Number(amount);
+        let firstPur = true;
+
         for (const pur of unpaidPurchases) {
           if (remaining <= 0) break;
           const pDue = Number(pur.due || 0);
@@ -152,14 +196,54 @@ export class PaymentsService {
             },
           });
 
-          await tx.purchasePayment.create({
-            data: {
-              purchaseId: pur.id,
-              paymentId: created.id,
-            },
-          });
+          if (firstPur) {
+            await tx.payment.update({
+              where: { id: created.id },
+              data: { amount: alloc },
+            });
+            await tx.purchasePayment.create({
+              data: {
+                purchaseId: pur.id,
+                paymentId: created.id,
+              },
+            });
+            firstPur = false;
+          } else {
+            const nextPayment = await tx.payment.create({
+              data: {
+                paymentDate: date,
+                amount: alloc,
+                paymentMethod: resolvedMethod,
+                referenceNumber: resolvedRef,
+                type: resolvedType,
+                notes: notes || null,
+                supplierId: resolvedSupplierId,
+              },
+            });
+            await tx.purchasePayment.create({
+              data: {
+                purchaseId: pur.id,
+                paymentId: nextPayment.id,
+              },
+            });
+          }
 
           remaining = Number((remaining - alloc).toFixed(2));
+        }
+
+        // If unpaid purchases were satisfied and remaining > 0, create unallocated payment for advance
+        if (remaining > 0 && !firstPur) {
+          await tx.payment.create({
+            data: {
+              paymentDate: date,
+              amount: remaining,
+              paymentMethod: resolvedMethod,
+              referenceNumber: resolvedRef,
+              type: resolvedType,
+              notes: notes ? `${notes} (Advance Paid)` : "Advance Paid",
+              supplierId: resolvedSupplierId,
+            },
+          });
         }
       }
 

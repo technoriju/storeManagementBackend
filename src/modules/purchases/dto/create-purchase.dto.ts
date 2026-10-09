@@ -99,5 +99,16 @@ export class CreatePurchaseDto {
   @IsOptional()
   @IsString()
   paymentStatus?: string;
+
+  @IsOptional()
+  @IsNumber()
+  advancePayment?: number;
+
+  @IsOptional()
+  showPreviousBalance?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  previousDue?: number;
 }
 

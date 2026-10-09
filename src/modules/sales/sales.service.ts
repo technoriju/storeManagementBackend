@@ -229,8 +229,69 @@ export class SalesService {
         }
       }
 
-      // 5. Handle Payment
-      const validPayAmount = Math.min(Number(paymentAmount || 0), Number(paidVal || 0));
+      // 5. Handle Advance Allocation & Payment
+      const advPaymentVal = saleData.advancePayment !== undefined ? Number(saleData.advancePayment) : 0;
+      const isAdvanceApplied = Boolean(saleData.showPreviousBalance && advPaymentVal > 0);
+      const advUsed = isAdvanceApplied ? Math.min(advPaymentVal, grandTotalNum) : 0;
+
+      // Allocate existing unallocated customer payments towards this sale for advUsed
+      let remainingAdvToAllocate = advUsed;
+      if (resolvedCustomerId && remainingAdvToAllocate > 0) {
+        const unallocatedPayments = await tx.payment.findMany({
+          where: {
+            customerId: resolvedCustomerId,
+            deletedAt: null,
+            type: { in: ["receive", "received"] },
+            salePayments: { none: {} },
+          },
+          orderBy: { id: "asc" },
+        });
+
+        for (const p of unallocatedPayments) {
+          if (remainingAdvToAllocate <= 0) break;
+          const pAmt = Number(p.amount);
+          if (pAmt <= remainingAdvToAllocate) {
+            await tx.salePayment.create({
+              data: {
+                saleId: sale.id,
+                paymentId: p.id,
+              },
+            });
+            remainingAdvToAllocate = Number((remainingAdvToAllocate - pAmt).toFixed(2));
+          } else {
+            const consumed = remainingAdvToAllocate;
+            const remainder = Number((pAmt - consumed).toFixed(2));
+
+            await tx.payment.update({
+              where: { id: p.id },
+              data: { amount: consumed },
+            });
+            await tx.salePayment.create({
+              data: {
+                saleId: sale.id,
+                paymentId: p.id,
+              },
+            });
+
+            await tx.payment.create({
+              data: {
+                paymentDate: p.paymentDate,
+                amount: remainder,
+                paymentMethod: p.paymentMethod,
+                referenceNumber: p.referenceNumber,
+                type: p.type,
+                notes: p.notes,
+                customerId: resolvedCustomerId,
+              },
+            });
+
+            remainingAdvToAllocate = 0;
+          }
+        }
+      }
+
+      // Fresh cash payment received (excluding applied advance)
+      const validPayAmount = Math.max(0, Math.min(Number(paymentAmount || 0), Number(paidVal || 0)) - advUsed);
       if (validPayAmount > 0) {
         const payment = await tx.payment.create({
           data: {
@@ -240,14 +301,14 @@ export class SalesService {
             referenceNumber: sale.invoiceNumber,
             type: "receive",
             customerId: resolvedCustomerId,
-          }
+          },
         });
 
         await tx.salePayment.create({
           data: {
             saleId: sale.id,
-            paymentId: payment.id
-          }
+            paymentId: payment.id,
+          },
         });
       }
 
