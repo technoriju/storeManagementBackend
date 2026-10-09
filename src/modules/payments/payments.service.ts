@@ -75,6 +75,94 @@ export class PaymentsService {
         },
       });
 
+      // 3. Auto-allocate received payment towards customer's unpaid sales (oldest first)
+      if (resolvedCustomerId && (resolvedType === "receive" || resolvedType === "received")) {
+        const unpaidSales = await tx.sale.findMany({
+          where: {
+            customerId: resolvedCustomerId,
+            deletedAt: null,
+            NOT: { status: { in: ["cancelled", "CANCELLED"] } },
+            due: { gt: 0 },
+          },
+          orderBy: { id: "asc" },
+        });
+
+        let remaining = Number(amount);
+        for (const sale of unpaidSales) {
+          if (remaining <= 0) break;
+          const sDue = Number(sale.due || 0);
+          const sPaid = Number(sale.paid || 0);
+          if (sDue <= 0) continue;
+
+          const alloc = Math.min(sDue, remaining);
+          const newPaid = Number((sPaid + alloc).toFixed(2));
+          const newDue = Number((sDue - alloc).toFixed(2));
+          const newStatus = newDue === 0 ? "Paid" : "Partial";
+
+          await tx.sale.update({
+            where: { id: sale.id },
+            data: {
+              paid: newPaid,
+              due: newDue,
+              paymentStatus: newStatus,
+            },
+          });
+
+          await tx.salePayment.create({
+            data: {
+              saleId: sale.id,
+              paymentId: created.id,
+            },
+          });
+
+          remaining = Number((remaining - alloc).toFixed(2));
+        }
+      }
+
+      // 4. Auto-allocate payment towards supplier's unpaid purchases (oldest first)
+      if (resolvedSupplierId && (resolvedType === "pay" || resolvedType === "paid")) {
+        const unpaidPurchases = await tx.purchase.findMany({
+          where: {
+            supplierId: resolvedSupplierId,
+            deletedAt: null,
+            NOT: { status: { in: ["cancelled", "CANCELLED"] } },
+            due: { gt: 0 },
+          },
+          orderBy: { id: "asc" },
+        });
+
+        let remaining = Number(amount);
+        for (const pur of unpaidPurchases) {
+          if (remaining <= 0) break;
+          const pDue = Number(pur.due || 0);
+          const pPaid = Number(pur.paid || 0);
+          if (pDue <= 0) continue;
+
+          const alloc = Math.min(pDue, remaining);
+          const newPaid = Number((pPaid + alloc).toFixed(2));
+          const newDue = Number((pDue - alloc).toFixed(2));
+          const newStatus = newDue === 0 ? "Paid" : "Partial";
+
+          await tx.purchase.update({
+            where: { id: pur.id },
+            data: {
+              paid: newPaid,
+              due: newDue,
+              paymentStatus: newStatus,
+            },
+          });
+
+          await tx.purchasePayment.create({
+            data: {
+              purchaseId: pur.id,
+              paymentId: created.id,
+            },
+          });
+
+          remaining = Number((remaining - alloc).toFixed(2));
+        }
+      }
+
       return this.mapPayment(created);
     });
   }

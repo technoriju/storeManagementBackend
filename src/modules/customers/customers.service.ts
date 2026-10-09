@@ -15,9 +15,10 @@ export class CustomersService {
       return existing;
     }
 
-    return this.prisma.customer.create({
+    const created = await this.prisma.customer.create({
       data: createCustomerDto,
     });
+    return { ...created, outstandingBalance: 0 };
   }
 
   async sync(payloads: any[]) {
@@ -50,6 +51,24 @@ export class CustomersService {
     return results;
   }
 
+  private calculateOutstanding(sales: any[], payments: any[]): number {
+    const salesDue = (sales || []).reduce(
+      (sum, s) => sum + Number(s.due || 0),
+      0
+    );
+    let unallocated = 0;
+    (payments || []).forEach((p) => {
+      const amt = Number(p.amount || 0);
+      const t = (p.type || 'receive').toLowerCase();
+      if (t === 'receive' || t === 'received') {
+        unallocated += amt;
+      } else if (t === 'pay' || t === 'paid') {
+        unallocated -= amt;
+      }
+    });
+    return Number((salesDue - unallocated).toFixed(2));
+  }
+
   async findAll() {
     const customers = await this.prisma.customer.findMany({
       where: { deletedAt: null },
@@ -58,17 +77,14 @@ export class CustomersService {
           where: {
             deletedAt: null,
             salePayments: { none: {} },
-            OR: [
-              { type: null },
-              { type: 'receive' },
-              { type: 'RECEIVE' },
-              { type: 'RECEIVED' },
-            ],
           },
-          select: { amount: true },
+          select: { amount: true, type: true },
         },
         sales: {
-          where: { deletedAt: null },
+          where: {
+            deletedAt: null,
+            NOT: { status: { in: ['cancelled', 'CANCELLED'] } },
+          },
           select: { due: true, paid: true, grandTotal: true },
         },
       },
@@ -77,18 +93,9 @@ export class CustomersService {
 
     return customers.map((c) => {
       const { sales, payments, ...rest } = c;
-      const salesDue = (sales || []).reduce(
-        (sum, s) => sum + Number(s.due || 0),
-        0
-      );
-      const unallocated = (payments || []).reduce(
-        (sum, p) => sum + Number(p.amount || 0),
-        0
-      );
-      const netBalance = Number((salesDue - unallocated).toFixed(2));
       return {
         ...rest,
-        outstandingBalance: netBalance,
+        outstandingBalance: this.calculateOutstanding(sales, payments),
       };
     });
   }
@@ -101,17 +108,14 @@ export class CustomersService {
           where: {
             deletedAt: null,
             salePayments: { none: {} },
-            OR: [
-              { type: null },
-              { type: 'receive' },
-              { type: 'RECEIVE' },
-              { type: 'RECEIVED' },
-            ],
           },
-          select: { amount: true },
+          select: { amount: true, type: true },
         },
         sales: {
-          where: { deletedAt: null },
+          where: {
+            deletedAt: null,
+            NOT: { status: { in: ['cancelled', 'CANCELLED'] } },
+          },
           select: { due: true, paid: true, grandTotal: true },
         },
       },
@@ -122,18 +126,9 @@ export class CustomersService {
     }
 
     const { sales, payments, ...rest } = item;
-    const salesDue = (sales || []).reduce(
-      (sum, s) => sum + Number(s.due || 0),
-      0
-    );
-    const unallocated = (payments || []).reduce(
-      (sum, p) => sum + Number(p.amount || 0),
-      0
-    );
-    const netBalance = Number((salesDue - unallocated).toFixed(2));
     return {
       ...rest,
-      outstandingBalance: netBalance,
+      outstandingBalance: this.calculateOutstanding(sales, payments),
     };
   }
 
@@ -155,13 +150,15 @@ export class CustomersService {
       }
     }
 
-    return this.prisma.customer.update({
+    await this.prisma.customer.update({
       where: { id },
       data: {
         ...updateCustomerDto,
         version: { increment: 1 },
       },
     });
+
+    return this.findOne(id);
   }
 
   async remove(id: number) {

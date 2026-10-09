@@ -21,6 +21,12 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 export class SuppliersController {
   constructor(private readonly service: SuppliersService) {}
 
+  @ApiOperation({ summary: "Sync suppliers (create/update)" })
+  @Post("sync")
+  sync(@Body() payloads: any[]) {
+    return this.service.sync(payloads);
+  }
+
   @ApiOperation({ summary: "Create a new supplier" })
   @Post()
   create(@Body() createDto: CreateSupplierDto) {
