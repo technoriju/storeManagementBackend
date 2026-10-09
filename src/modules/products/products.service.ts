@@ -303,7 +303,19 @@ export class ProductsService {
         data.subUnitId = null;
       }
     }
-    const product = await this.prisma.product.create({ data });
+    let product;
+    try {
+      product = await this.prisma.product.create({ data });
+    } catch (err: any) {
+      if (err?.code === 'P2002' || (err?.message && err.message.includes('Product_productCode_key'))) {
+        const uniqueSuffix = `-${Date.now().toString().slice(-4)}`;
+        data.productCode = `${data.productCode}${uniqueSuffix}`;
+        data.sku = `${data.sku || data.productCode}${uniqueSuffix}`;
+        product = await this.prisma.product.create({ data });
+      } else {
+        throw err;
+      }
+    }
     if (product.baseUnitId) {
       await this.ensureProductUnits(product.id, product.baseUnitId, product.subUnitId, Number(product.conversionRate || 1));
     }
@@ -728,6 +740,7 @@ export class ProductsService {
               description: description || existing.description,
               isActive,
               isPriceInclusive,
+              updatedAt: new Date(),
             },
           });
           updatedCount++;
@@ -887,7 +900,7 @@ export class ProductsService {
           productUnits: { include: { unit: true } },
           stockBalances: true,
         },
-        orderBy: { id: "desc" },
+        orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
         ...(hasPagination ? { skip, take: limit } : {}),
       }),
     ]);
@@ -972,7 +985,10 @@ export class ProductsService {
     }
     const product = await this.prisma.product.update({
       where: { id: BigInt(id) },
-      data,
+      data: {
+        ...data,
+        updatedAt: new Date(),
+      },
     });
     if (product.baseUnitId) {
       await this.ensureProductUnits(product.id, product.baseUnitId, product.subUnitId, Number(product.conversionRate || 1));
