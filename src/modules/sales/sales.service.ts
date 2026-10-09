@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../infrastructure/data-access/prisma/prisma.service";
 import { CreateSaleDto } from "./dto/create-sale.dto";
 import { UpdateSaleDto } from "./dto/update-sale.dto";
@@ -386,13 +387,58 @@ export class SalesService {
     };
   }
 
-  async findAll() {
-    const sales = await this.prisma.sale.findMany({
-      where: { deletedAt: null },
-      include: this.saleInclude,
-      orderBy: { id: 'desc' },
-    });
-    return sales.map((sale) => this.formatSale(sale));
+  async findAll(query?: any) {
+    const where: Prisma.SaleWhereInput = { deletedAt: null };
+
+    if (query?.customerId) {
+      where.customerId = Number(query.customerId);
+    }
+    if (query?.status) {
+      where.status = String(query.status);
+    }
+    if (query?.paymentStatus) {
+      where.paymentStatus = String(query.paymentStatus);
+    }
+    if (query?.search && String(query.search).trim()) {
+      const q = String(query.search).trim();
+      where.OR = [
+        { invoiceNumber: { contains: q } },
+        { status: { contains: q } },
+        { paymentStatus: { contains: q } },
+        { notes: { contains: q } },
+        { customer: { name: { contains: q } } },
+        { customer: { phone: { contains: q } } },
+      ];
+    }
+
+    const hasPagination = query?.page !== undefined || query?.limit !== undefined;
+    const page = Math.max(1, Number(query?.page || 1));
+    const limit = Math.max(1, Number(query?.limit || 10));
+    const skip = (page - 1) * limit;
+
+    const [total, sales] = await Promise.all([
+      hasPagination ? this.prisma.sale.count({ where }) : Promise.resolve(0),
+      this.prisma.sale.findMany({
+        where,
+        include: this.saleInclude,
+        orderBy: { id: "desc" },
+        ...(hasPagination ? { skip, take: limit } : {}),
+      }),
+    ]);
+
+    const mapped = sales.map((sale) => this.formatSale(sale));
+
+    if (hasPagination) {
+      return {
+        data: mapped,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      };
+    }
+
+    return mapped;
   }
 
   async findOne(id: any) {

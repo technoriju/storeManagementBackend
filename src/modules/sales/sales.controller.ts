@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Put, Param, Delete, UseGuards } from "@nestjs/common";
+import { Controller, Get, Post, Body, Patch, Put, Param, Delete, Query, UseGuards } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiBearerAuth } from "@nestjs/swagger";
 import { SalesService } from "./sales.service";
 import { CreateSaleDto } from "./dto/create-sale.dto";
@@ -20,8 +20,8 @@ export class SalesController {
 
   @ApiOperation({ summary: "Get all sales" })
   @Get()
-  findAll() {
-    return this.salesService.findAll();
+  findAll(@Query() query?: any) {
+    return this.salesService.findAll(query);
   }
 
   @ApiOperation({ summary: "Get a sale by id" })
