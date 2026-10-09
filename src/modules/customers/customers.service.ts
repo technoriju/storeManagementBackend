@@ -12,7 +12,7 @@ export class CustomersService {
       where: { name: createCustomerDto.name, deletedAt: null },
     });
     if (existing) {
-      throw new ConflictException("Customer name already exists");
+      return existing;
     }
 
     return this.prisma.customer.create({
