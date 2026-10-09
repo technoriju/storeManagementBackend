@@ -707,33 +707,36 @@ export class ReportsService {
       let totalReturned = 0;
       const linkedPaymentIds = new Set<string>();
 
+      let totalSalesDue = 0;
       customer.sales.forEach((sale) => {
-        totalBilled += this.toNumber(sale.grandTotal);
-        let salePaid = 0;
+        const grandTotal = this.toNumber(sale.grandTotal);
+        const saleDue = this.toNumber(sale.due);
+        const salePaid = this.toNumber(sale.paid);
+        totalBilled += grandTotal;
+        totalSalesDue += saleDue;
+        totalPaid += salePaid;
+
         sale.payments.forEach((p) => {
           if (p.payment) {
             linkedPaymentIds.add(String(p.payment.id));
-            salePaid += this.toNumber(p.payment.amount);
           }
         });
-        if (sale.paid && this.toNumber(sale.paid) > salePaid) {
-          salePaid = this.toNumber(sale.paid);
-        }
-        totalPaid += salePaid;
         sale.returns.forEach((r) => {
           totalReturned += this.toNumber(r.totalAmount);
         });
       });
 
       // Include standalone payments received from this customer
+      let standalonePaid = 0;
       customer.payments?.forEach((p) => {
         if (!linkedPaymentIds.has(String(p.id)) && (!p.type || p.type.toLowerCase() === "receive")) {
-          totalPaid += this.toNumber(p.amount);
+          standalonePaid += this.toNumber(p.amount);
         }
       });
+      totalPaid += standalonePaid;
 
       const outstanding = Number(
-        Math.max(0, totalBilled - totalPaid - totalReturned).toFixed(2),
+        Math.max(0, totalSalesDue - standalonePaid - totalReturned).toFixed(2),
       );
       if (outstanding > 0) customersWithDue++;
 
@@ -843,33 +846,36 @@ export class ReportsService {
       let totalReturned = 0;
       const linkedPaymentIds = new Set<string>();
 
+      let totalPurchasesDue = 0;
       supplier.purchases.forEach((purchase) => {
-        totalPurchased += this.toNumber(purchase.grandTotal);
-        let purPaid = 0;
+        const grandTotal = this.toNumber(purchase.grandTotal);
+        const purDue = this.toNumber(purchase.due);
+        const purPaid = this.toNumber(purchase.paid);
+        totalPurchased += grandTotal;
+        totalPurchasesDue += purDue;
+        totalPaid += purPaid;
+
         purchase.payments.forEach((p) => {
           if (p.payment) {
             linkedPaymentIds.add(String(p.payment.id));
-            purPaid += this.toNumber(p.payment.amount);
           }
         });
-        if (purchase.paid && this.toNumber(purchase.paid) > purPaid) {
-          purPaid = this.toNumber(purchase.paid);
-        }
-        totalPaid += purPaid;
         purchase.returns.forEach((r) => {
           totalReturned += this.toNumber(r.totalAmount);
         });
       });
 
       // Include standalone payments made to this supplier
+      let standalonePaid = 0;
       supplier.payments?.forEach((p) => {
         if (!linkedPaymentIds.has(String(p.id)) && (!p.type || p.type.toLowerCase() === "pay")) {
-          totalPaid += this.toNumber(p.amount);
+          standalonePaid += this.toNumber(p.amount);
         }
       });
+      totalPaid += standalonePaid;
 
       const outstanding = Number(
-        Math.max(0, totalPurchased - totalPaid - totalReturned).toFixed(2),
+        Math.max(0, totalPurchasesDue - standalonePaid - totalReturned).toFixed(2),
       );
       if (outstanding > 0) suppliersWithDue++;
 

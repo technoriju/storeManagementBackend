@@ -54,6 +54,19 @@ export class CustomersService {
     const customers = await this.prisma.customer.findMany({
       where: { deletedAt: null },
       include: {
+        payments: {
+          where: {
+            deletedAt: null,
+            salePayments: { none: {} },
+            OR: [
+              { type: null },
+              { type: 'receive' },
+              { type: 'RECEIVE' },
+              { type: 'RECEIVED' },
+            ],
+          },
+          select: { amount: true },
+        },
         sales: {
           where: { deletedAt: null },
           select: { due: true, paid: true, grandTotal: true },
@@ -63,14 +76,19 @@ export class CustomersService {
     });
 
     return customers.map((c) => {
-      const { sales, ...rest } = c;
-      const outstandingBalance = (sales || []).reduce(
+      const { sales, payments, ...rest } = c;
+      const salesDue = (sales || []).reduce(
         (sum, s) => sum + Number(s.due || 0),
         0
       );
+      const unallocated = (payments || []).reduce(
+        (sum, p) => sum + Number(p.amount || 0),
+        0
+      );
+      const netBalance = Number((salesDue - unallocated).toFixed(2));
       return {
         ...rest,
-        outstandingBalance,
+        outstandingBalance: netBalance,
       };
     });
   }
@@ -79,6 +97,19 @@ export class CustomersService {
     const item = await this.prisma.customer.findFirst({
       where: { id, deletedAt: null },
       include: {
+        payments: {
+          where: {
+            deletedAt: null,
+            salePayments: { none: {} },
+            OR: [
+              { type: null },
+              { type: 'receive' },
+              { type: 'RECEIVE' },
+              { type: 'RECEIVED' },
+            ],
+          },
+          select: { amount: true },
+        },
         sales: {
           where: { deletedAt: null },
           select: { due: true, paid: true, grandTotal: true },
@@ -90,14 +121,19 @@ export class CustomersService {
       throw new NotFoundException(`Customer with ID ${id} not found`);
     }
 
-    const { sales, ...rest } = item;
-    const outstandingBalance = (sales || []).reduce(
+    const { sales, payments, ...rest } = item;
+    const salesDue = (sales || []).reduce(
       (sum, s) => sum + Number(s.due || 0),
       0
     );
+    const unallocated = (payments || []).reduce(
+      (sum, p) => sum + Number(p.amount || 0),
+      0
+    );
+    const netBalance = Number((salesDue - unallocated).toFixed(2));
     return {
       ...rest,
-      outstandingBalance,
+      outstandingBalance: netBalance,
     };
   }
 
