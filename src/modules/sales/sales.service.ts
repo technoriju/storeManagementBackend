@@ -230,11 +230,12 @@ export class SalesService {
       }
 
       // 5. Handle Payment
-      if (paymentAmount && paymentAmount > 0) {
+      const validPayAmount = Math.min(Number(paymentAmount || 0), Number(paidVal || 0));
+      if (validPayAmount > 0) {
         const payment = await tx.payment.create({
           data: {
             paymentDate: new Date(),
-            amount: paymentAmount,
+            amount: validPayAmount,
             paymentMethod: paymentMethod || "CASH",
             referenceNumber: sale.invoiceNumber,
             type: "receive",
@@ -659,6 +660,70 @@ export class SalesService {
         data: updateData,
         include: this.saleInclude,
       });
+
+      // 6. Synchronize Payment records with updated paid amount
+      const targetPaid = saleData.paid !== undefined
+        ? Number(saleData.paid)
+        : (paymentAmount !== undefined ? Number(paymentAmount) : undefined);
+
+      if (targetPaid !== undefined) {
+        const existingSalePayments = await tx.salePayment.findMany({
+          where: { saleId: targetSaleId, deletedAt: null },
+          include: { payment: true },
+        });
+
+        if (targetPaid <= 0) {
+          // Sale is now Unpaid -> remove linked sale payments and payment rows
+          for (const sp of existingSalePayments) {
+            await tx.salePayment.delete({ where: { id: sp.id } });
+            if (sp.paymentId) {
+              await tx.payment.delete({ where: { id: sp.paymentId } }).catch(() => {});
+            }
+          }
+        } else {
+          // Sale is Paid or Partial -> ensure payment amount matches targetPaid
+          if (existingSalePayments.length > 0) {
+            const primarySp = existingSalePayments[0];
+            if (primarySp.paymentId) {
+              await tx.payment.update({
+                where: { id: primarySp.paymentId },
+                data: {
+                  amount: targetPaid,
+                  paymentMethod: paymentMethod || "CASH",
+                  customerId: saleData.customerId !== undefined ? updateData.customerId : existing.customerId,
+                  updatedAt: new Date(),
+                },
+              });
+            }
+            // Remove any redundant extra sale payments
+            for (let i = 1; i < existingSalePayments.length; i++) {
+              const extraSp = existingSalePayments[i];
+              await tx.salePayment.delete({ where: { id: extraSp.id } });
+              if (extraSp.paymentId) {
+                await tx.payment.delete({ where: { id: extraSp.paymentId } }).catch(() => {});
+              }
+            }
+          } else {
+            // No payment existed yet, create one
+            const newPayment = await tx.payment.create({
+              data: {
+                paymentDate: new Date(),
+                amount: targetPaid,
+                paymentMethod: paymentMethod || "CASH",
+                referenceNumber: existing.invoiceNumber,
+                type: "receive",
+                customerId: saleData.customerId !== undefined ? updateData.customerId : existing.customerId,
+              },
+            });
+            await tx.salePayment.create({
+              data: {
+                saleId: targetSaleId,
+                paymentId: newPayment.id,
+              },
+            });
+          }
+        }
+      }
 
       return this.formatSale(updated);
     });

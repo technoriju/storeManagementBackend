@@ -14,7 +14,11 @@ export class SyncService {
         const result = await this.processChange(change);
         results.push({ id: change.id, status: "COMPLETED" });
       } catch (error) {
-        this.logger.error(`Failed to process change ${change.id}:`, error);
+        if (error instanceof ConflictException) {
+          this.logger.warn(`Conflict processing change ${change.id}: ${error.message}`);
+        } else {
+          this.logger.error(`Failed to process change ${change.id}:`, error);
+        }
         results.push({ id: change.id, status: "FAILED", error: error.message });
       }
     }
