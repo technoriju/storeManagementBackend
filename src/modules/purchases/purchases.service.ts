@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../infrastructure/data-access/prisma/prisma.service";
 import { CreatePurchaseDto } from "./dto/create-purchase.dto";
 import { UpdatePurchaseDto } from "./dto/update-purchase.dto";
@@ -301,18 +302,61 @@ export class PurchasesService {
     });
   }
 
-  async findAll() {
-    return this.prisma.purchase.findMany({
-      where: { deletedAt: null },
-      include: {
-        supplier: true,
-        warehouse: true,
-        branch: true,
-        items: { include: { product: true } },
-        payments: { include: { payment: true } },
-      },
-      orderBy: { id: 'desc' },
-    });
+  async findAll(query?: any) {
+    const where: Prisma.PurchaseWhereInput = { deletedAt: null };
+
+    if (query?.supplierId) {
+      where.supplierId = Number(query.supplierId);
+    }
+    if (query?.status) {
+      where.status = String(query.status);
+    }
+    if (query?.paymentStatus) {
+      where.paymentStatus = String(query.paymentStatus);
+    }
+    if (query?.search && String(query.search).trim()) {
+      const q = String(query.search).trim();
+      where.OR = [
+        { invoiceNumber: { contains: q } },
+        { status: { contains: q } },
+        { paymentStatus: { contains: q } },
+        { notes: { contains: q } },
+        { supplier: { name: { contains: q } } },
+      ];
+    }
+
+    const hasPagination = query?.page !== undefined || query?.limit !== undefined;
+    const page = Math.max(1, Number(query?.page || 1));
+    const limit = Math.max(1, Number(query?.limit || 10));
+    const skip = (page - 1) * limit;
+
+    const [total, purchases] = await Promise.all([
+      hasPagination ? this.prisma.purchase.count({ where }) : Promise.resolve(0),
+      this.prisma.purchase.findMany({
+        where,
+        include: {
+          supplier: true,
+          warehouse: true,
+          branch: true,
+          items: { include: { product: true } },
+          payments: { include: { payment: true } },
+        },
+        orderBy: { id: "desc" },
+        ...(hasPagination ? { skip, take: limit } : {}),
+      }),
+    ]);
+
+    if (hasPagination) {
+      return {
+        data: purchases,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      };
+    }
+
+    return purchases;
   }
 
   async findOne(id: any) {

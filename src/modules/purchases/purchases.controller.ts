@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Put, Param, Delete, UseGuards } from "@nestjs/common";
+import { Controller, Get, Post, Body, Patch, Put, Param, Delete, Query, UseGuards } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiBearerAuth } from "@nestjs/swagger";
 import { PurchasesService } from "./purchases.service";
 import { CreatePurchaseDto } from "./dto/create-purchase.dto";
@@ -20,8 +20,8 @@ export class PurchasesController {
 
   @ApiOperation({ summary: "Get all purchases" })
   @Get()
-  findAll() {
-    return this.purchasesService.findAll();
+  findAll(@Query() query?: any) {
+    return this.purchasesService.findAll(query);
   }
 
   @ApiOperation({ summary: "Get a purchase by id" })

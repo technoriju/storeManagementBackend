@@ -6,6 +6,7 @@ import {
   Put, Patch,
   Param,
   Delete,
+  Query,
   UseGuards,
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiBearerAuth } from "@nestjs/swagger";
@@ -68,8 +69,8 @@ export class ProductsController {
 
   @ApiOperation({ summary: "Get all products" })
   @Get()
-  findAll() {
-    return this.productsService.findAll();
+  findAll(@Query() query?: any) {
+    return this.productsService.findAll(query);
   }
 
   @ApiOperation({ summary: "Get a product by id" })
