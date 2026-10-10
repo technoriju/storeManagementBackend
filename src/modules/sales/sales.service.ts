@@ -383,6 +383,10 @@ export class SalesService {
 
     return {
       ...sale,
+      customerName: sale.customer?.name ?? sale.customerName ?? undefined,
+      customerPhone: sale.customer?.phone ?? sale.customerPhone ?? undefined,
+      customerAddress: sale.customer?.address ?? sale.customerAddress ?? undefined,
+      customerGstin: sale.customer?.taxNumber ?? sale.customer?.taxId ?? sale.customer?.gstin ?? sale.customerGstin ?? undefined,
       items: formattedItems,
     };
   }
