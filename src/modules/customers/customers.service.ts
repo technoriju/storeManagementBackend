@@ -52,7 +52,82 @@ export class CustomersService {
   }
 
   private calculateOutstanding(sales: any[], payments: any[]): number {
-    const totalBilled = (sales || []).reduce((sum, s) => {
+    const validSales = (sales || []).filter(
+      (s) => !s.status || !["cancelled", "CANCELLED"].includes(s.status)
+    );
+
+    // Sort chronologically by date/createdAt/id
+    const sortedSales = [...validSales].sort((a, b) => {
+      const timeA = new Date(a.createdAt || a.saleDate || 0).getTime();
+      const timeB = new Date(b.createdAt || b.saleDate || 0).getTime();
+      if (timeA !== timeB) return timeA - timeB;
+      return Number(a.id || 0) - Number(b.id || 0);
+    });
+
+    // Find the latest sale where showPreviousBalance was active
+    let anchorIndex = -1;
+    for (let i = sortedSales.length - 1; i >= 0; i--) {
+      if (Boolean(sortedSales[i].showPreviousBalance)) {
+        anchorIndex = i;
+        break;
+      }
+    }
+
+    if (anchorIndex >= 0) {
+      const anchor = sortedSales[anchorIndex];
+      const anchorPrev = Number(anchor.previousDue || 0) - Number(anchor.advancePayment || 0);
+      const anchorTotal = Number(anchor.grandTotal || anchor.total || 0);
+      let anchorReturns = 0;
+      if (anchor.returns && Array.isArray(anchor.returns)) {
+        anchorReturns = anchor.returns.reduce(
+          (sum: number, r: any) => sum + Number(r.totalAmount || 0),
+          0
+        );
+      }
+      const anchorPaid = Number(anchor.paid || 0);
+      let balance = anchorPrev + (anchorTotal - anchorReturns) - anchorPaid;
+
+      // Add subsequent sales after anchor
+      const anchorTime = new Date(anchor.createdAt || anchor.saleDate || 0).getTime();
+      const subsequentInvoiceNumbers = new Set<string>();
+
+      for (let i = anchorIndex + 1; i < sortedSales.length; i++) {
+        const s = sortedSales[i];
+        if (s.invoiceNumber) subsequentInvoiceNumbers.add(String(s.invoiceNumber));
+        const gt = Number(s.grandTotal || s.total || 0);
+        let ret = 0;
+        if (s.returns && Array.isArray(s.returns)) {
+          ret = s.returns.reduce((sum: number, r: any) => sum + Number(r.totalAmount || 0), 0);
+        }
+        const pd = Number(s.paid || 0);
+        balance += (gt - ret) - pd;
+      }
+
+      // Standalone payments received after anchor sale
+      const anchorInvoiceNumber = anchor.invoiceNumber ? String(anchor.invoiceNumber) : null;
+      (payments || []).forEach((p) => {
+        const pTime = new Date(p.createdAt || p.paymentDate || 0).getTime();
+        const pRef = p.referenceNumber || p.reference ? String(p.referenceNumber || p.reference) : null;
+
+        if (pRef && (pRef === anchorInvoiceNumber || subsequentInvoiceNumbers.has(pRef))) {
+          return;
+        }
+
+        if (pTime > anchorTime) {
+          const amt = Number(p.amount || 0);
+          const t = (p.type || "receive").toLowerCase();
+          if (t === "receive" || t === "received") {
+            balance -= amt;
+          } else if (t === "pay" || t === "paid") {
+            balance += amt;
+          }
+        }
+      });
+
+      return Number(balance.toFixed(2));
+    }
+
+    const totalBilled = (sortedSales || []).reduce((sum, s) => {
       const gt = Number(s.grandTotal || s.total || 0);
       let returned = 0;
       if (s.returns && Array.isArray(s.returns)) {
@@ -87,7 +162,7 @@ export class CustomersService {
           where: {
             deletedAt: null,
           },
-          select: { amount: true, type: true },
+          select: { id: true, amount: true, type: true, referenceNumber: true, paymentDate: true, createdAt: true },
         },
         sales: {
           where: {
@@ -95,9 +170,17 @@ export class CustomersService {
             NOT: { status: { in: ["cancelled", "CANCELLED"] } },
           },
           select: {
+            id: true,
+            invoiceNumber: true,
+            status: true,
             due: true,
             paid: true,
             grandTotal: true,
+            previousDue: true,
+            advancePayment: true,
+            showPreviousBalance: true,
+            saleDate: true,
+            createdAt: true,
             returns: { select: { totalAmount: true } },
           },
         },
@@ -122,7 +205,7 @@ export class CustomersService {
           where: {
             deletedAt: null,
           },
-          select: { amount: true, type: true },
+          select: { id: true, amount: true, type: true, referenceNumber: true, paymentDate: true, createdAt: true },
         },
         sales: {
           where: {
@@ -130,9 +213,17 @@ export class CustomersService {
             NOT: { status: { in: ["cancelled", "CANCELLED"] } },
           },
           select: {
+            id: true,
+            invoiceNumber: true,
+            status: true,
             due: true,
             paid: true,
             grandTotal: true,
+            previousDue: true,
+            advancePayment: true,
+            showPreviousBalance: true,
+            saleDate: true,
+            createdAt: true,
             returns: { select: { totalAmount: true } },
           },
         },
