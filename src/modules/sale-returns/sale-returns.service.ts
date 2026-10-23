@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../../infrastructure/data-access/prisma/prisma.service";
 import { CreateSaleReturnDto } from "./dto/create-sale-return.dto";
+import { recalculateCustomerBalance } from "../customers/customers.service";
 
 @Injectable()
 export class SaleReturnsService {
@@ -117,6 +118,11 @@ export class SaleReturnsService {
         }
       }
 
+      // 4. Update customer outstanding balance if attached to sale
+      if (sale.customerId) {
+        await recalculateCustomerBalance(tx, sale.customerId);
+      }
+
       return saleReturn;
     });
   }
@@ -147,10 +153,14 @@ export class SaleReturnsService {
   }
 
   async remove(id: bigint) {
-    await this.findOne(id);
-    return this.prisma.saleReturn.update({
+    const item = await this.findOne(id);
+    const result = await this.prisma.saleReturn.update({
       where: { id },
       data: { deletedAt: new Date() },
     });
+    if (item.sale?.customerId) {
+      await recalculateCustomerBalance(this.prisma, item.sale.customerId);
+    }
+    return result;
   }
 }

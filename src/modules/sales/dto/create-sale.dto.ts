@@ -110,5 +110,9 @@ export class CreateSaleDto {
   @IsOptional()
   @IsString()
   paymentStatus?: string;
+
+  @IsOptional()
+  @IsNumber()
+  balanceAdjustment?: number;
 }
 

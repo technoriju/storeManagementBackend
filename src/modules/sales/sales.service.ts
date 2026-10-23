@@ -3,13 +3,14 @@ import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../infrastructure/data-access/prisma/prisma.service";
 import { CreateSaleDto } from "./dto/create-sale.dto";
 import { UpdateSaleDto } from "./dto/update-sale.dto";
+import { recalculateCustomerBalance } from "../customers/customers.service";
 
 @Injectable()
 export class SalesService {
   constructor(private prisma: PrismaService) {}
 
   async create(createSaleDto: CreateSaleDto) {
-    const { items, paymentAmount, paymentMethod, ...saleData } = createSaleDto;
+    const { items, paymentAmount, paymentMethod, balanceAdjustment, ...saleData } = createSaleDto;
 
     const created = await this.prisma.$transaction(async (tx) => {
       // 1. Resolve product units and quantities
@@ -144,19 +145,23 @@ export class SalesService {
       // 3. Create Sale
       const sale = await tx.sale.create({
         data: {
-          ...saleData,
-          branchId: resolvedBranchId,
-          warehouseId: resolvedWarehouseId,
-          customerId: resolvedCustomerId,
-          status: saleData.status || "COMPLETED",
+          invoiceNumber: saleData.invoiceNumber,
           saleDate: new Date(saleData.saleDate),
+          status: saleData.status || "COMPLETED",
+          subTotal: Number(saleData.subTotal || 0),
+          taxTotal: Number(saleData.taxTotal || 0),
+          discountTotal: Number(saleData.discountTotal || 0),
+          grandTotal: grandTotalNum,
           paid: paidVal,
           due: dueVal,
-          paymentStatus: payStatus,
           previousDue: saleData.previousDue !== undefined ? Number(saleData.previousDue) : 0,
           advancePayment: saleData.advancePayment !== undefined ? Number(saleData.advancePayment) : 0,
           showPreviousBalance: Boolean(saleData.showPreviousBalance),
+          paymentStatus: payStatus,
           notes: saleData.notes || null,
+          branchId: resolvedBranchId,
+          warehouseId: resolvedWarehouseId,
+          customerId: resolvedCustomerId,
           items: {
             create: resolvedItems.map((item) => ({
               productId: item.productId,
@@ -292,7 +297,8 @@ export class SalesService {
       }
 
       // Fresh cash payment received (excluding applied advance)
-      const validPayAmount = Math.max(0, Math.min(Number(paymentAmount || 0), Number(paidVal || 0)) - advUsed);
+      const targetPay = paymentAmount !== undefined && Number(paymentAmount) > 0 ? Number(paymentAmount) : Number(paidVal || 0);
+      const validPayAmount = Math.max(0, targetPay - advUsed);
       if (validPayAmount > 0) {
         const payment = await tx.payment.create({
           data: {
@@ -311,6 +317,39 @@ export class SalesService {
             paymentId: payment.id,
           },
         });
+      }
+
+      // Record explicit customer balance adjustment if manual previous due was applied
+      let adjDelta = balanceAdjustment !== undefined ? Number(balanceAdjustment) : 0;
+      if (resolvedCustomerId && Boolean(saleData.showPreviousBalance)) {
+        if (balanceAdjustment === undefined) {
+          const currentCust = await tx.customer.findUnique({
+            where: { id: resolvedCustomerId },
+            select: { outstandingBalance: true },
+          });
+          const priorBal = Number(currentCust?.outstandingBalance || 0);
+          const enteredPrev = Number(saleData.previousDue || 0) - Number(saleData.advancePayment || 0);
+          adjDelta = Number((enteredPrev - priorBal).toFixed(2));
+        }
+
+        if (Math.abs(adjDelta) > 0.001) {
+          await tx.payment.create({
+            data: {
+              paymentDate: new Date(),
+              amount: Math.abs(adjDelta),
+              paymentMethod: "adjustment",
+              referenceNumber: sale.invoiceNumber,
+              type: adjDelta > 0 ? "pay" : "receive",
+              notes: `Mutual balance adjustment (${adjDelta > 0 ? "+" : "-"}₹${Math.abs(adjDelta).toFixed(2)}) on ${sale.invoiceNumber}`,
+              customerId: resolvedCustomerId,
+            },
+          });
+        }
+      }
+
+      // Update customer outstandingBalance directly in DB transaction using ledger recalculation
+      if (resolvedCustomerId) {
+        await recalculateCustomerBalance(tx, resolvedCustomerId);
       }
 
       return sale;
@@ -836,6 +875,13 @@ export class SalesService {
         }
       }
 
+      if (existing.customerId) {
+        await recalculateCustomerBalance(tx, existing.customerId);
+      }
+      if (updateData.customerId && updateData.customerId !== existing.customerId) {
+        await recalculateCustomerBalance(tx, updateData.customerId);
+      }
+
       return this.formatSale(updated);
     });
   }
@@ -928,7 +974,24 @@ export class SalesService {
         });
       }
 
-      // 3. Mark sale payments soft-deleted
+      // 3. Mark sale payments and payments soft-deleted
+      const salePayments = await tx.salePayment.findMany({
+        where: { saleId: existing.id },
+        select: { paymentId: true },
+      });
+      const paymentIds = salePayments.map((sp) => sp.paymentId);
+      if (paymentIds.length > 0) {
+        await tx.payment.updateMany({
+          where: { id: { in: paymentIds } },
+          data: { deletedAt: new Date() },
+        });
+      }
+      if (existing.invoiceNumber) {
+        await tx.payment.updateMany({
+          where: { referenceNumber: existing.invoiceNumber },
+          data: { deletedAt: new Date() },
+        });
+      }
       if (tx.salePayment?.updateMany) {
         await tx.salePayment.updateMany({
           where: { saleId: existing.id },
@@ -941,6 +1004,11 @@ export class SalesService {
         where: { id: existing.id },
         data: { deletedAt: new Date() },
       });
+
+      // 5. Update customer balance in DB
+      if (existing.customerId) {
+        await recalculateCustomerBalance(tx, existing.customerId);
+      }
 
       return {
         success: true,

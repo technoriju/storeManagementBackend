@@ -401,6 +401,7 @@ model Customer {
   email   String?
   address String?
   gstin   String?
+  outstandingBalance Float @default(0)
 
   status    String    @default("ACTIVE")
   createdAt DateTime  @default(now())
