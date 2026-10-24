@@ -110,5 +110,9 @@ export class CreatePurchaseDto {
   @IsOptional()
   @IsNumber()
   previousDue?: number;
+
+  @IsOptional()
+  @IsNumber()
+  balanceAdjustment?: number;
 }
 

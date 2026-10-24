@@ -3,6 +3,7 @@ import { PrismaService } from "../../infrastructure/data-access/prisma/prisma.se
 import { CreatePaymentDto } from "./dto/create-payment.dto";
 import { UpdatePaymentDto } from "./dto/update-payment.dto";
 import { recalculateCustomerBalance } from "../customers/customers.service";
+import { recalculateSupplierBalance } from "../suppliers/suppliers.service";
 
 @Injectable()
 export class PaymentsService {
@@ -253,6 +254,11 @@ export class PaymentsService {
         }
       }
 
+      // Update supplier outstandingBalance directly in DB transaction using ledger recalculation
+      if (resolvedSupplierId) {
+        await recalculateSupplierBalance(tx, resolvedSupplierId);
+      }
+
       return this.mapPayment(created);
     });
   }
@@ -357,6 +363,9 @@ export class PaymentsService {
     if (updated.customerId) {
       await recalculateCustomerBalance(this.prisma, updated.customerId);
     }
+    if (updated.supplierId) {
+      await recalculateSupplierBalance(this.prisma, updated.supplierId);
+    }
 
     return this.mapPayment(updated);
   }
@@ -369,6 +378,9 @@ export class PaymentsService {
     });
     if (payment.customerId) {
       await recalculateCustomerBalance(this.prisma, payment.customerId);
+    }
+    if (payment.supplierId) {
+      await recalculateSupplierBalance(this.prisma, payment.supplierId);
     }
     return result;
   }

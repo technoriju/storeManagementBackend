@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../../infrastructure/data-access/prisma/prisma.service";
 import { CreatePurchaseReturnDto } from "./dto/create-purchase-return.dto";
+import { recalculateSupplierBalance } from "../suppliers/suppliers.service";
 
 @Injectable()
 export class PurchaseReturnsService {
@@ -117,6 +118,10 @@ export class PurchaseReturnsService {
         }
       }
 
+      if (purchase.supplierId) {
+        await recalculateSupplierBalance(tx, purchase.supplierId);
+      }
+
       return purchaseReturn;
     });
   }
@@ -147,10 +152,14 @@ export class PurchaseReturnsService {
   }
 
   async remove(id: bigint) {
-    await this.findOne(id);
-    return this.prisma.purchaseReturn.update({
+    const item = await this.findOne(id);
+    const result = await this.prisma.purchaseReturn.update({
       where: { id },
       data: { deletedAt: new Date() },
     });
+    if (item.purchase?.supplierId) {
+      await recalculateSupplierBalance(this.prisma, item.purchase.supplierId);
+    }
+    return result;
   }
 }
