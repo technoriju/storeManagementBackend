@@ -22,6 +22,18 @@ describe("SalesService - Delete and Update Stock Adjustments", () => {
       createMany: jest.fn(),
       updateMany: jest.fn(),
     },
+    salePayment: {
+      findMany: jest.fn().mockResolvedValue([]),
+      updateMany: jest.fn(),
+      delete: jest.fn(),
+      create: jest.fn(),
+    },
+    payment: {
+      updateMany: jest.fn(),
+      delete: jest.fn(),
+      update: jest.fn(),
+      create: jest.fn(),
+    },
     stockBalance: {
       findUnique: jest.fn(),
       update: jest.fn(),
@@ -114,6 +126,10 @@ describe("SalesService - Delete and Update Stock Adjustments", () => {
 
       // Verifies soft deletion
       expect(mockTx.saleItem.updateMany).toHaveBeenCalledWith({
+        where: { saleId },
+        data: { deletedAt: expect.any(Date) },
+      });
+      expect(mockTx.salePayment.updateMany).toHaveBeenCalledWith({
         where: { saleId },
         data: { deletedAt: expect.any(Date) },
       });

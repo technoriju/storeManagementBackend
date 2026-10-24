@@ -3,15 +3,16 @@ import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../infrastructure/data-access/prisma/prisma.service";
 import { CreatePurchaseDto } from "./dto/create-purchase.dto";
 import { UpdatePurchaseDto } from "./dto/update-purchase.dto";
+import { recalculateSupplierBalance } from "../suppliers/suppliers.service";
 
 @Injectable()
 export class PurchasesService {
   constructor(private prisma: PrismaService) {}
 
   async create(createPurchaseDto: CreatePurchaseDto) {
-    const { items, paymentAmount, paymentMethod, advancePayment, showPreviousBalance, previousDue, ...purchaseData } = createPurchaseDto;
+    const { items, paymentAmount, paymentMethod, advancePayment, showPreviousBalance, previousDue, balanceAdjustment, ...purchaseData } = createPurchaseDto;
 
-    return this.prisma.$transaction(async (tx) => {
+    const created = await this.prisma.$transaction(async (tx) => {
       // 1. Resolve product units and quantities
       const resolvedItems: any[] = [];
       for (const item of items) {
@@ -148,6 +149,9 @@ export class PurchasesService {
           purchaseDate: new Date(purchaseData.purchaseDate),
           paid: paidVal,
           due: dueVal,
+          previousDue: previousDue !== undefined ? Number(previousDue) : 0,
+          advancePayment: advancePayment !== undefined ? Number(advancePayment) : 0,
+          showPreviousBalance: Boolean(showPreviousBalance),
           paymentStatus: payStatus,
           notes: purchaseData.notes || null,
           items: {
@@ -277,7 +281,9 @@ export class PurchasesService {
         }
       }
 
-      const validPayAmount = Math.max(0, Math.min(Number(paymentAmount || 0), Number(paidVal || 0)) - advUsed);
+      // Fresh cash payment paid to supplier (excluding applied advance)
+      const targetPay = paymentAmount !== undefined && Number(paymentAmount) > 0 ? Number(paymentAmount) : Number(paidVal || 0);
+      const validPayAmount = Math.max(0, targetPay - advUsed);
       if (validPayAmount > 0) {
         const payment = await tx.payment.create({
           data: {
@@ -298,8 +304,47 @@ export class PurchasesService {
         });
       }
 
+      // Record explicit supplier balance adjustment if manual previous due was applied
+      let adjDelta = balanceAdjustment !== undefined ? Number(balanceAdjustment) : 0;
+      if (resolvedSupplierId && Boolean(showPreviousBalance)) {
+        if (balanceAdjustment === undefined) {
+          const currentSupp: any = await (tx as any).supplier.findUnique({
+            where: { id: resolvedSupplierId },
+            select: { outstandingBalance: true },
+          });
+          const priorBal = Number(currentSupp?.outstandingBalance || 0);
+          const enteredPrev = Number(previousDue || 0) - Number(advancePayment || 0);
+          adjDelta = Number((enteredPrev - priorBal).toFixed(2));
+        }
+
+        if (Math.abs(adjDelta) > 0.001) {
+          await tx.payment.create({
+            data: {
+              paymentDate: new Date(),
+              amount: Math.abs(adjDelta),
+              paymentMethod: "adjustment",
+              referenceNumber: purchase.invoiceNumber,
+              type: adjDelta > 0 ? "pay" : "receive",
+              notes: `Mutual balance adjustment (${adjDelta > 0 ? "+" : "-"}₹${Math.abs(adjDelta).toFixed(2)}) on ${purchase.invoiceNumber}`,
+              supplierId: resolvedSupplierId,
+            },
+          });
+        }
+      }
+
+      // Update supplier outstandingBalance directly in DB transaction using ledger recalculation
+      if (resolvedSupplierId) {
+        await recalculateSupplierBalance(tx, resolvedSupplierId);
+      }
+
       return purchase;
     });
+
+    try {
+      return await this.findOne(created.id);
+    } catch (_) {
+      return created;
+    }
   }
 
   async findAll(query?: any) {
@@ -428,7 +473,7 @@ export class PurchasesService {
 
     const { items, paymentAmount, paymentMethod, ...purchaseData } = updatePurchaseDto;
 
-    return this.prisma.$transaction(async (tx) => {
+    const created = await this.prisma.$transaction(async (tx) => {
       let resolvedWarehouseId: number | null = null;
       if (purchaseData.warehouseId) {
         const wh = await tx.warehouse.findUnique({ where: { id: Number(purchaseData.warehouseId) } });
@@ -681,8 +726,21 @@ export class PurchasesService {
         },
       });
 
+      if (existing.supplierId) {
+        await recalculateSupplierBalance(tx, existing.supplierId);
+      }
+      if (updateData.supplierId && updateData.supplierId !== existing.supplierId) {
+        await recalculateSupplierBalance(tx, updateData.supplierId);
+      }
+
       return updated;
     });
+
+    try {
+      return await this.findOne(created.id);
+    } catch (_) {
+      return created;
+    }
   }
 
   async remove(id: any) {
@@ -712,7 +770,7 @@ export class PurchasesService {
       throw new NotFoundException("Purchase not found");
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const created = await this.prisma.$transaction(async (tx) => {
       // 1. Deduct Stock (fallback to default warehouse if not specified on purchase)
       let targetWarehouseId = existing.warehouseId;
       if (!targetWarehouseId) {
@@ -773,7 +831,27 @@ export class PurchasesService {
         });
       }
 
-      // 3. Mark purchase payments soft-deleted
+      // 3. Mark purchase payments and related payments soft-deleted
+      let paymentIds: bigint[] = [];
+      if (tx.purchasePayment?.findMany) {
+        const purchasePayments = await tx.purchasePayment.findMany({
+          where: { purchaseId: existing.id },
+          select: { paymentId: true },
+        });
+        paymentIds = purchasePayments.map((pp) => pp.paymentId);
+      }
+      if (paymentIds.length > 0 && tx.payment?.updateMany) {
+        await tx.payment.updateMany({
+          where: { id: { in: paymentIds } },
+          data: { deletedAt: new Date() },
+        });
+      }
+      if (existing.invoiceNumber && tx.payment?.updateMany) {
+        await tx.payment.updateMany({
+          where: { referenceNumber: existing.invoiceNumber },
+          data: { deletedAt: new Date() },
+        });
+      }
       if (tx.purchasePayment?.updateMany) {
         await tx.purchasePayment.updateMany({
           where: { purchaseId: existing.id },
@@ -787,6 +865,11 @@ export class PurchasesService {
         data: { deletedAt: new Date() },
       });
 
+      // 5. Update supplier balance in DB
+      if (existing.supplierId) {
+        await recalculateSupplierBalance(tx, existing.supplierId);
+      }
+
       return {
         id: updated.id.toString(),
         invoiceNumber: updated.invoiceNumber,
@@ -794,5 +877,7 @@ export class PurchasesService {
         message: "Purchase deleted successfully",
       };
     });
+
+    return created;
   }
 }

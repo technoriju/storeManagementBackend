@@ -1,11 +1,160 @@
-import { Injectable, NotFoundException, ConflictException } from "@nestjs/common";
+import { Injectable, NotFoundException, ConflictException, OnModuleInit, Logger } from "@nestjs/common";
 import { PrismaService } from "../../infrastructure/data-access/prisma/prisma.service";
 import { CreateCustomerDto } from "./dto/create-customer.dto";
 import { UpdateCustomerDto } from "./dto/update-customer.dto";
 
+export function calculateCustomerLedger(sales: any[], payments: any[]): number {
+  const validSales = (sales || []).filter(
+    (s) => !s.status || !["cancelled", "CANCELLED"].includes(s.status)
+  );
+
+  // Sort sales chronologically by date/createdAt/id
+  const sortedSales = [...validSales].sort((a, b) => {
+    const timeA = new Date(a.createdAt || a.saleDate || 0).getTime();
+    const timeB = new Date(b.createdAt || b.saleDate || 0).getTime();
+    if (timeA !== timeB) return timeA - timeB;
+    return Number(a.id || 0) - Number(b.id || 0);
+  });
+
+  // Sort payments chronologically by date/createdAt/id
+  const sortedPayments = [...(payments || [])].sort((a, b) => {
+    const timeA = new Date(a.createdAt || a.paymentDate || 0).getTime();
+    const timeB = new Date(b.createdAt || b.paymentDate || 0).getTime();
+    if (timeA !== timeB) return timeA - timeB;
+    return Number(a.id || 0) - Number(b.id || 0);
+  });
+
+  const adjustmentRefs = new Set(
+    sortedPayments
+      .filter((p) => p.paymentMethod?.toLowerCase() === "adjustment" || p.method?.toLowerCase() === "adjustment")
+      .map((p) => String(p.referenceNumber || p.reference || ""))
+      .filter(Boolean)
+  );
+
+  let runningBalance = 0;
+  let pIdx = 0;
+
+  for (const s of sortedSales) {
+    const sTime = new Date(s.createdAt || s.saleDate || 0).getTime();
+
+    // Apply payments made before or at this sale
+    while (pIdx < sortedPayments.length) {
+      const p = sortedPayments[pIdx];
+      const pTime = new Date(p.createdAt || p.paymentDate || 0).getTime();
+      if (pTime < sTime) {
+        const amt = Number(p.amount || 0);
+        const t = (p.type || "receive").toLowerCase();
+        if (t === "receive" || t === "received" || t === "adjustment_credit") {
+          runningBalance -= amt;
+        } else if (t === "pay" || t === "paid" || t === "adjustment_debit") {
+          runningBalance += amt;
+        }
+        pIdx++;
+      } else {
+        break;
+      }
+    }
+
+    // Check for manual balance adjustment on sale if not already recorded in payments
+    const invNum = String(s.invoiceNumber || "");
+    if (Boolean(s.showPreviousBalance) && !adjustmentRefs.has(invNum)) {
+      const enteredPrev = Number(s.previousDue || 0) - Number(s.advancePayment || 0);
+      const delta = enteredPrev - runningBalance;
+      if (Math.abs(delta) > 0.001) {
+        runningBalance += delta;
+      }
+    }
+
+    const gt = Number(s.grandTotal || s.total || 0);
+    let ret = 0;
+    if (s.returns && Array.isArray(s.returns)) {
+      ret = s.returns.reduce((sum: number, r: any) => sum + Number(r.totalAmount || 0), 0);
+    }
+    runningBalance += (gt - ret);
+  }
+
+  // Apply remaining payments made after the last sale
+  while (pIdx < sortedPayments.length) {
+    const p = sortedPayments[pIdx];
+    const amt = Number(p.amount || 0);
+    const t = (p.type || "receive").toLowerCase();
+    if (t === "receive" || t === "received" || t === "adjustment_credit") {
+      runningBalance -= amt;
+    } else if (t === "pay" || t === "paid" || t === "adjustment_debit") {
+      runningBalance += amt;
+    }
+    pIdx++;
+  }
+
+  return Number(runningBalance.toFixed(2));
+}
+
+export async function recalculateCustomerBalance(
+  prisma: any,
+  customerId: number
+): Promise<number> {
+  const customer = await prisma.customer.findUnique({
+    where: { id: customerId },
+    include: {
+      payments: {
+        where: { deletedAt: null },
+        select: { id: true, amount: true, type: true, referenceNumber: true, paymentDate: true, createdAt: true, paymentMethod: true },
+      },
+      sales: {
+        where: {
+          deletedAt: null,
+          NOT: { status: { in: ["cancelled", "CANCELLED"] } },
+        },
+        select: {
+          id: true,
+          invoiceNumber: true,
+          status: true,
+          due: true,
+          paid: true,
+          grandTotal: true,
+          previousDue: true,
+          advancePayment: true,
+          showPreviousBalance: true,
+          saleDate: true,
+          createdAt: true,
+          returns: { select: { totalAmount: true } },
+        },
+      },
+    },
+  });
+
+  if (!customer) return 0;
+  const balance = calculateCustomerLedger(customer.sales, customer.payments);
+  await prisma.customer.update({
+    where: { id: customerId },
+    data: {
+      outstandingBalance: balance,
+    },
+  });
+  return balance;
+}
+
 @Injectable()
-export class CustomersService {
+export class CustomersService implements OnModuleInit {
+  private readonly logger = new Logger(CustomersService.name);
+
   constructor(private readonly prisma: PrismaService) {}
+
+  async onModuleInit() {
+    try {
+      this.logger.log("Syncing all customer outstandingBalances directly in DB...");
+      const customers = await this.prisma.customer.findMany({
+        where: { deletedAt: null },
+        select: { id: true },
+      });
+      for (const c of customers) {
+        await recalculateCustomerBalance(this.prisma, c.id);
+      }
+      this.logger.log(`Synced balances for ${customers.length} customers in DB.`);
+    } catch (err) {
+      this.logger.warn("Initial customer balance calculation warning:", err);
+    }
+  }
 
   async create(createCustomerDto: CreateCustomerDto) {
     const existing = await this.prisma.customer.findFirst({
@@ -16,9 +165,12 @@ export class CustomersService {
     }
 
     const created = await this.prisma.customer.create({
-      data: createCustomerDto,
+      data: {
+        ...createCustomerDto,
+        outstandingBalance: 0,
+      },
     });
-    return { ...created, outstandingBalance: 0 };
+    return created;
   }
 
   async sync(payloads: any[]) {
@@ -51,194 +203,31 @@ export class CustomersService {
     return results;
   }
 
-  private calculateOutstanding(sales: any[], payments: any[]): number {
-    const validSales = (sales || []).filter(
-      (s) => !s.status || !["cancelled", "CANCELLED"].includes(s.status)
-    );
+  public calculateOutstanding(sales: any[], payments: any[]): number {
+    return calculateCustomerLedger(sales, payments);
+  }
 
-    // Sort chronologically by date/createdAt/id
-    const sortedSales = [...validSales].sort((a, b) => {
-      const timeA = new Date(a.createdAt || a.saleDate || 0).getTime();
-      const timeB = new Date(b.createdAt || b.saleDate || 0).getTime();
-      if (timeA !== timeB) return timeA - timeB;
-      return Number(a.id || 0) - Number(b.id || 0);
-    });
-
-    // Find the latest sale where showPreviousBalance was active
-    let anchorIndex = -1;
-    for (let i = sortedSales.length - 1; i >= 0; i--) {
-      if (Boolean(sortedSales[i].showPreviousBalance)) {
-        anchorIndex = i;
-        break;
-      }
-    }
-
-    if (anchorIndex >= 0) {
-      const anchor = sortedSales[anchorIndex];
-      const anchorPrev = Number(anchor.previousDue || 0) - Number(anchor.advancePayment || 0);
-      const anchorTotal = Number(anchor.grandTotal || anchor.total || 0);
-      let anchorReturns = 0;
-      if (anchor.returns && Array.isArray(anchor.returns)) {
-        anchorReturns = anchor.returns.reduce(
-          (sum: number, r: any) => sum + Number(r.totalAmount || 0),
-          0
-        );
-      }
-      const anchorPaid = Number(anchor.paid || 0);
-      let balance = anchorPrev + (anchorTotal - anchorReturns) - anchorPaid;
-
-      // Add subsequent sales after anchor
-      const anchorTime = new Date(anchor.createdAt || anchor.saleDate || 0).getTime();
-      const subsequentInvoiceNumbers = new Set<string>();
-
-      for (let i = anchorIndex + 1; i < sortedSales.length; i++) {
-        const s = sortedSales[i];
-        if (s.invoiceNumber) subsequentInvoiceNumbers.add(String(s.invoiceNumber));
-        const gt = Number(s.grandTotal || s.total || 0);
-        let ret = 0;
-        if (s.returns && Array.isArray(s.returns)) {
-          ret = s.returns.reduce((sum: number, r: any) => sum + Number(r.totalAmount || 0), 0);
-        }
-        const pd = Number(s.paid || 0);
-        balance += (gt - ret) - pd;
-      }
-
-      // Standalone payments received after anchor sale
-      const anchorInvoiceNumber = anchor.invoiceNumber ? String(anchor.invoiceNumber) : null;
-      (payments || []).forEach((p) => {
-        const pTime = new Date(p.createdAt || p.paymentDate || 0).getTime();
-        const pRef = p.referenceNumber || p.reference ? String(p.referenceNumber || p.reference) : null;
-
-        if (pRef && (pRef === anchorInvoiceNumber || subsequentInvoiceNumbers.has(pRef))) {
-          return;
-        }
-
-        if (pTime > anchorTime) {
-          const amt = Number(p.amount || 0);
-          const t = (p.type || "receive").toLowerCase();
-          if (t === "receive" || t === "received") {
-            balance -= amt;
-          } else if (t === "pay" || t === "paid") {
-            balance += amt;
-          }
-        }
-      });
-
-      return Number(balance.toFixed(2));
-    }
-
-    const totalBilled = (sortedSales || []).reduce((sum, s) => {
-      const gt = Number(s.grandTotal || s.total || 0);
-      let returned = 0;
-      if (s.returns && Array.isArray(s.returns)) {
-        returned = s.returns.reduce(
-          (rSum: number, r: any) => rSum + Number(r.totalAmount || 0),
-          0
-        );
-      }
-      return sum + (gt - returned);
-    }, 0);
-
-    let totalReceived = 0;
-    let totalRefunded = 0;
-    (payments || []).forEach((p) => {
-      const amt = Number(p.amount || 0);
-      const t = (p.type || "receive").toLowerCase();
-      if (t === "receive" || t === "received") {
-        totalReceived += amt;
-      } else if (t === "pay" || t === "paid") {
-        totalRefunded += amt;
-      }
-    });
-
-    return Number(((totalBilled + totalRefunded) - totalReceived).toFixed(2));
+  public async recalculateBalance(customerId: number, tx?: any): Promise<number> {
+    return recalculateCustomerBalance(tx || this.prisma, customerId);
   }
 
   async findAll() {
-    const customers = await this.prisma.customer.findMany({
+    return this.prisma.customer.findMany({
       where: { deletedAt: null },
-      include: {
-        payments: {
-          where: {
-            deletedAt: null,
-          },
-          select: { id: true, amount: true, type: true, referenceNumber: true, paymentDate: true, createdAt: true },
-        },
-        sales: {
-          where: {
-            deletedAt: null,
-            NOT: { status: { in: ["cancelled", "CANCELLED"] } },
-          },
-          select: {
-            id: true,
-            invoiceNumber: true,
-            status: true,
-            due: true,
-            paid: true,
-            grandTotal: true,
-            previousDue: true,
-            advancePayment: true,
-            showPreviousBalance: true,
-            saleDate: true,
-            createdAt: true,
-            returns: { select: { totalAmount: true } },
-          },
-        },
-      },
       orderBy: { id: "desc" },
-    });
-
-    return customers.map((c) => {
-      const { sales, payments, ...rest } = c;
-      return {
-        ...rest,
-        outstandingBalance: this.calculateOutstanding(sales, payments),
-      };
     });
   }
 
   async findOne(id: number) {
     const item = await this.prisma.customer.findFirst({
       where: { id, deletedAt: null },
-      include: {
-        payments: {
-          where: {
-            deletedAt: null,
-          },
-          select: { id: true, amount: true, type: true, referenceNumber: true, paymentDate: true, createdAt: true },
-        },
-        sales: {
-          where: {
-            deletedAt: null,
-            NOT: { status: { in: ["cancelled", "CANCELLED"] } },
-          },
-          select: {
-            id: true,
-            invoiceNumber: true,
-            status: true,
-            due: true,
-            paid: true,
-            grandTotal: true,
-            previousDue: true,
-            advancePayment: true,
-            showPreviousBalance: true,
-            saleDate: true,
-            createdAt: true,
-            returns: { select: { totalAmount: true } },
-          },
-        },
-      },
     });
 
     if (!item) {
       throw new NotFoundException(`Customer with ID ${id} not found`);
     }
 
-    const { sales, payments, ...rest } = item;
-    return {
-      ...rest,
-      outstandingBalance: this.calculateOutstanding(sales, payments),
-    };
+    return item;
   }
 
   async update(id: number, updateCustomerDto: UpdateCustomerDto) {

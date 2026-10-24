@@ -2,6 +2,8 @@ import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../../infrastructure/data-access/prisma/prisma.service";
 import { CreatePaymentDto } from "./dto/create-payment.dto";
 import { UpdatePaymentDto } from "./dto/update-payment.dto";
+import { recalculateCustomerBalance } from "../customers/customers.service";
+import { recalculateSupplierBalance } from "../suppliers/suppliers.service";
 
 @Injectable()
 export class PaymentsService {
@@ -161,6 +163,11 @@ export class PaymentsService {
         }
       }
 
+      // Update customer outstandingBalance directly in DB transaction using ledger recalculation
+      if (resolvedCustomerId) {
+        await recalculateCustomerBalance(tx, resolvedCustomerId);
+      }
+
       // 4. Auto-allocate payment towards supplier's unpaid purchases (oldest first)
       if (resolvedSupplierId && (resolvedType === "pay" || resolvedType === "paid")) {
         const unpaidPurchases = await tx.purchase.findMany({
@@ -245,6 +252,11 @@ export class PaymentsService {
             },
           });
         }
+      }
+
+      // Update supplier outstandingBalance directly in DB transaction using ledger recalculation
+      if (resolvedSupplierId) {
+        await recalculateSupplierBalance(tx, resolvedSupplierId);
       }
 
       return this.mapPayment(created);
@@ -348,14 +360,28 @@ export class PaymentsService {
       },
     });
 
+    if (updated.customerId) {
+      await recalculateCustomerBalance(this.prisma, updated.customerId);
+    }
+    if (updated.supplierId) {
+      await recalculateSupplierBalance(this.prisma, updated.supplierId);
+    }
+
     return this.mapPayment(updated);
   }
 
   async remove(id: bigint | number) {
-    await this.findOne(id);
-    return this.prisma.payment.update({
+    const payment = await this.findOne(id);
+    const result = await this.prisma.payment.update({
       where: { id: BigInt(id) },
       data: { deletedAt: new Date() },
     });
+    if (payment.customerId) {
+      await recalculateCustomerBalance(this.prisma, payment.customerId);
+    }
+    if (payment.supplierId) {
+      await recalculateSupplierBalance(this.prisma, payment.supplierId);
+    }
+    return result;
   }
 }
