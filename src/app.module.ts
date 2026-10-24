@@ -35,6 +35,7 @@ import { QuotationsModule } from "./modules/quotations/quotations.module";
 import { PurchaseOrdersModule } from "./modules/purchase-orders/purchase-orders.module";
 import { SaleReturnsModule } from "./modules/sale-returns/sale-returns.module";
 import { PurchaseReturnsModule } from "./modules/purchase-returns/purchase-returns.module";
+import { DashboardModule } from "./modules/dashboard/dashboard.module";
 
 // We will import feature modules here
 
@@ -82,6 +83,7 @@ import { PurchaseReturnsModule } from "./modules/purchase-returns/purchase-retur
     PurchaseOrdersModule,
     SaleReturnsModule,
     PurchaseReturnsModule,
+    DashboardModule,
     // Add other feature modules here as they are developed
   ],
   providers: [
