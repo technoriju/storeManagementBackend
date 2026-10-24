@@ -323,7 +323,7 @@ export class SalesService {
       let adjDelta = balanceAdjustment !== undefined ? Number(balanceAdjustment) : 0;
       if (resolvedCustomerId && Boolean(saleData.showPreviousBalance)) {
         if (balanceAdjustment === undefined) {
-          const currentCust = await tx.customer.findUnique({
+          const currentCust: any = await (tx as any).customer.findUnique({
             where: { id: resolvedCustomerId },
             select: { outstandingBalance: true },
           });
@@ -975,18 +975,21 @@ export class SalesService {
       }
 
       // 3. Mark sale payments and payments soft-deleted
-      const salePayments = await tx.salePayment.findMany({
-        where: { saleId: existing.id },
-        select: { paymentId: true },
-      });
-      const paymentIds = salePayments.map((sp) => sp.paymentId);
-      if (paymentIds.length > 0) {
+      let paymentIds: bigint[] = [];
+      if (tx.salePayment?.findMany) {
+        const salePayments = await tx.salePayment.findMany({
+          where: { saleId: existing.id },
+          select: { paymentId: true },
+        });
+        paymentIds = salePayments.map((sp) => sp.paymentId);
+      }
+      if (paymentIds.length > 0 && tx.payment?.updateMany) {
         await tx.payment.updateMany({
           where: { id: { in: paymentIds } },
           data: { deletedAt: new Date() },
         });
       }
-      if (existing.invoiceNumber) {
+      if (existing.invoiceNumber && tx.payment?.updateMany) {
         await tx.payment.updateMany({
           where: { referenceNumber: existing.invoiceNumber },
           data: { deletedAt: new Date() },

@@ -308,7 +308,7 @@ export class PurchasesService {
       let adjDelta = balanceAdjustment !== undefined ? Number(balanceAdjustment) : 0;
       if (resolvedSupplierId && Boolean(showPreviousBalance)) {
         if (balanceAdjustment === undefined) {
-          const currentSupp = await tx.supplier.findUnique({
+          const currentSupp: any = await (tx as any).supplier.findUnique({
             where: { id: resolvedSupplierId },
             select: { outstandingBalance: true },
           });
@@ -832,18 +832,21 @@ export class PurchasesService {
       }
 
       // 3. Mark purchase payments and related payments soft-deleted
-      const purchasePayments = await tx.purchasePayment.findMany({
-        where: { purchaseId: existing.id },
-        select: { paymentId: true },
-      });
-      const paymentIds = purchasePayments.map((pp) => pp.paymentId);
-      if (paymentIds.length > 0) {
+      let paymentIds: bigint[] = [];
+      if (tx.purchasePayment?.findMany) {
+        const purchasePayments = await tx.purchasePayment.findMany({
+          where: { purchaseId: existing.id },
+          select: { paymentId: true },
+        });
+        paymentIds = purchasePayments.map((pp) => pp.paymentId);
+      }
+      if (paymentIds.length > 0 && tx.payment?.updateMany) {
         await tx.payment.updateMany({
           where: { id: { in: paymentIds } },
           data: { deletedAt: new Date() },
         });
       }
-      if (existing.invoiceNumber) {
+      if (existing.invoiceNumber && tx.payment?.updateMany) {
         await tx.payment.updateMany({
           where: { referenceNumber: existing.invoiceNumber },
           data: { deletedAt: new Date() },
