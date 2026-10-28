@@ -213,6 +213,22 @@ export class ReportsController {
     return this.reportsService.getBalanceSheetReport(filters);
   }
 
+  @Get("trial-balance")
+  @ApiOperation({
+    summary: "15b. Trial Balance (Ledgers, Debits, Credits, Balance Verification)",
+  })
+  async getTrialBalance(@Query() filters: ReportFiltersDto) {
+    return this.reportsService.getTrialBalance(filters);
+  }
+
+  @Get("cash-flow")
+  @ApiOperation({
+    summary: "15c. Cash Flow Statement (Operating Inflows, Outflows, Net Cash Flow)",
+  })
+  async getCashFlow(@Query() filters: ReportFiltersDto) {
+    return this.reportsService.getCashFlow(filters);
+  }
+
   @Get(["invoices", "invoice"])
   @ApiOperation({
     summary: "16. Invoices Report with tax components and payment status",

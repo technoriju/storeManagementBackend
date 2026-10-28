@@ -856,6 +856,46 @@ model IncomeCategory {
   deviceId    String?
 }
 
+model BankAccount {
+  id             Int       @id @default(autoincrement())
+  accountName    String
+  accountNumber  String?
+  bankName       String?
+  branchName     String?
+  ifscCode       String?
+  accountType    String    @default("BANK") // "BANK" or "CASH"
+  openingBalance Decimal   @default(0.00) @db.Decimal(12, 2)
+  currentBalance Decimal   @default(0.00) @db.Decimal(12, 2)
+  status         String    @default("ACTIVE")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+  version        Int       @default(1)
+  deviceId       String?
+
+  transfersFrom  MoneyTransfer[] @relation("TransferFromAccount")
+  transfersTo    MoneyTransfer[] @relation("TransferToAccount")
+}
+
+model MoneyTransfer {
+  id             BigInt    @id @default(autoincrement())
+  transferDate   DateTime
+  fromAccountId  Int
+  toAccountId    Int
+  amount         Decimal   @db.Decimal(12, 2)
+  reference      String?
+  description    String?
+  status         String    @default("COMPLETED")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+  version        Int       @default(1)
+  deviceId       String?
+
+  fromAccount    BankAccount @relation("TransferFromAccount", fields: [fromAccountId], references: [id])
+  toAccount      BankAccount @relation("TransferToAccount", fields: [toAccountId], references: [id])
+}
+
 // ==========================================
 // INVENTORY
 // ==========================================
