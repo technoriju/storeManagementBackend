@@ -149,6 +149,22 @@ export class ReportsController {
     return this.reportsService.getExpenseReport(filters);
   }
 
+  @Get("incomes")
+  @ApiOperation({
+    summary: "9b. Income Report with category breakdown and averages",
+  })
+  async getIncomeReport(@Query() filters: ReportFiltersDto) {
+    return this.reportsService.getIncomeReport(filters);
+  }
+
+  @Get("income")
+  @ApiOperation({
+    summary: "9b. Income Report alias",
+  })
+  async getIncomeReportAlias(@Query() filters: ReportFiltersDto) {
+    return this.reportsService.getIncomeReport(filters);
+  }
+
   @Get("gst-summary")
   @ApiOperation({
     summary: "10. GST Summary (Output GST, Input Tax Credit, Net Liability)",

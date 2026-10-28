@@ -52,6 +52,7 @@ model Branch {
   purchases  Purchase[]
   sales      Sale[]
   expenses   Expense[]
+  incomes    Income[]
 }
 
 model Warehouse {
@@ -115,6 +116,7 @@ model User {
   role          Role           @relation(fields: [roleId], references: [id])
   auditLogs     AuditLog[]
   expenses      Expense[]
+  incomes       Income[]
   refreshTokens RefreshToken[]
 }
 
@@ -796,6 +798,7 @@ model Expense {
   amount      Decimal  @db.Decimal(12, 2)
   category    String
   description String?
+  reference   String?
 
   status    String    @default("ACTIVE")
   createdAt DateTime  @default(now())
@@ -806,6 +809,51 @@ model Expense {
 
   branch Branch @relation(fields: [branchId], references: [id])
   user   User   @relation(fields: [userId], references: [id])
+}
+
+model ExpenseCategory {
+  id          Int       @id @default(autoincrement())
+  name        String
+  description String?
+  status      String    @default("ACTIVE")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  version     Int       @default(1)
+  deviceId    String?
+}
+
+model Income {
+  id          BigInt   @id @default(autoincrement())
+  branchId    Int?
+  userId      Int?
+  incomeDate  DateTime
+  amount      Decimal  @db.Decimal(12, 2)
+  category    String
+  description String?
+  reference   String?
+
+  status    String    @default("ACTIVE")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  version   Int       @default(1)
+  deviceId  String?
+
+  branch Branch? @relation(fields: [branchId], references: [id])
+  user   User?   @relation(fields: [userId], references: [id])
+}
+
+model IncomeCategory {
+  id          Int       @id @default(autoincrement())
+  name        String
+  description String?
+  status      String    @default("ACTIVE")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  version     Int       @default(1)
+  deviceId    String?
 }
 
 // ==========================================
