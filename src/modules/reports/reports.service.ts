@@ -1127,6 +1127,96 @@ export class ReportsService {
     };
   }
 
+    // ==========================================
+  // 9b. INCOME REPORT
+  // ==========================================
+  async getIncomeReport(filters: ReportFiltersDto) {
+    const { page, limit, skip } = this.getPagination(
+      filters.page,
+      filters.limit,
+    );
+    const dateRange = this.parseDateRange(filters.startDate, filters.endDate);
+
+    const where: any = {
+      deletedAt: null,
+      ...(dateRange && { incomeDate: dateRange }),
+      ...(filters.branchId && { branchId: filters.branchId }),
+      ...(filters.userId && { userId: filters.userId }),
+      ...(filters.categoryId && { category: filters.categoryId }),
+      ...(filters.search && {
+        OR: [
+          { category: { contains: filters.search } },
+          { description: { contains: filters.search } },
+          { reference: { contains: filters.search } },
+        ],
+      }),
+    };
+
+    const [aggregate, categoryGroups, totalRecords, incomes] =
+      await Promise.all([
+        this.prisma.income.aggregate({
+          where,
+          _count: { id: true },
+          _sum: { amount: true },
+          _avg: { amount: true },
+        }),
+        this.prisma.income.groupBy({
+          by: ["category"],
+          where,
+          _sum: { amount: true },
+          _count: { id: true },
+        }),
+        this.prisma.income.count({ where }),
+        this.prisma.income.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy: {
+            incomeDate: filters.sortOrder === "asc" ? "asc" : "desc",
+          },
+          include: {
+            branch: { select: { id: true, name: true } },
+            user: { select: { id: true, fullName: true, username: true } },
+          },
+        }),
+      ]);
+
+    const formattedData = incomes.map((inc) => ({
+      id: inc.id,
+      incomeDate: inc.incomeDate,
+      category: inc.category,
+      amount: this.toNumber(inc.amount),
+      description: inc.description || "",
+      reference: inc.reference || "",
+      branchName: inc.branch?.name || "",
+      userName: inc.user?.fullName || inc.user?.username || "",
+    }));
+
+    const byCategory: Record<string, { total: number; count: number }> = {};
+    categoryGroups.forEach((cg) => {
+      byCategory[cg.category] = {
+        total: this.toNumber(cg._sum.amount),
+        count: cg._count.id,
+      };
+    });
+
+    return {
+      summary: {
+        totalIncomeCount: aggregate._count.id,
+        totalAmount: this.toNumber(aggregate._sum.amount),
+        averageAmount: this.toNumber(aggregate._avg.amount),
+        byCategory,
+      },
+      pagination: {
+        page,
+        limit,
+        totalPages: Math.ceil(totalRecords / limit),
+        totalRecords,
+      },
+      data: formattedData,
+    };
+  }
+
   // ==========================================
   // 10. GST SUMMARY
   // ==========================================

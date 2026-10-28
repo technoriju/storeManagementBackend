@@ -23,6 +23,7 @@ import { SalesModule } from "./modules/sales/sales.module";
 import { InventoryModule } from "./modules/inventory/inventory.module";
 import { PaymentsModule } from "./modules/payments/payments.module";
 import { ExpensesModule } from "./modules/expenses/expenses.module";
+import { IncomesModule } from "./modules/incomes/incomes.module";
 import { ReportsModule } from "./modules/reports/reports.module";
 import { BillingModule } from "./modules/billing/billing.module";
 import { SyncModule } from "./modules/sync/sync.module";
@@ -67,6 +68,7 @@ import { DashboardModule } from "./modules/dashboard/dashboard.module";
     InventoryModule,
     PaymentsModule,
     ExpensesModule,
+    IncomesModule,
     ReportsModule,
     BillingModule,
     SyncModule,
