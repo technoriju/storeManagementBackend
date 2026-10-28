@@ -1859,6 +1859,200 @@ export class ReportsService {
   }
 
   // ==========================================
+  // 15b. TRIAL BALANCE
+  // ==========================================
+  async getTrialBalance(filters: ReportFiltersDto) {
+    const dateRange = this.parseDateRange(filters.startDate, filters.endDate);
+
+    const [
+      salesAgg,
+      purchasesAgg,
+      expensesAgg,
+      incomesAgg,
+      paymentsInAgg,
+      paymentsOutAgg,
+      bankAccounts,
+      products,
+    ] = await Promise.all([
+      this.prisma.sale.aggregate({
+        where: { deletedAt: null, ...(dateRange && { saleDate: dateRange }) },
+        _sum: { grandTotal: true, due: true },
+      }),
+      this.prisma.purchase.aggregate({
+        where: { deletedAt: null, ...(dateRange && { purchaseDate: dateRange }) },
+        _sum: { grandTotal: true, due: true },
+      }),
+      this.prisma.expense.aggregate({
+        where: { deletedAt: null, ...(dateRange && { expenseDate: dateRange }) },
+        _sum: { amount: true },
+      }),
+      this.prisma.income.aggregate({
+        where: { deletedAt: null, ...(dateRange && { incomeDate: dateRange }) },
+        _sum: { amount: true },
+      }),
+      this.prisma.payment.aggregate({
+        where: { deletedAt: null, type: "receive", ...(dateRange && { paymentDate: dateRange }) },
+        _sum: { amount: true },
+      }),
+      this.prisma.payment.aggregate({
+        where: { deletedAt: null, type: "pay", ...(dateRange && { paymentDate: dateRange }) },
+        _sum: { amount: true },
+      }),
+      this.prisma.bankAccount.findMany({
+        where: { deletedAt: null },
+      }),
+      this.prisma.product.findMany({
+        where: { deletedAt: null },
+        include: { stockBalances: { where: { deletedAt: null } } },
+      }),
+    ]);
+
+    let inventoryValuation = 0;
+    products.forEach((p) => {
+      const qty = p.stockBalances.reduce((sum, b) => sum + Number(b.quantity || 0), 0);
+      const cost = Number(p.purchasePrice || 0);
+      if (qty > 0 && cost > 0) inventoryValuation += qty * cost;
+    });
+
+    const salesTotal = this.toNumber(salesAgg._sum.grandTotal);
+    const purchasesTotal = this.toNumber(purchasesAgg._sum.grandTotal);
+    const expensesTotal = this.toNumber(expensesAgg._sum.amount);
+    const incomesTotal = this.toNumber(incomesAgg._sum.amount);
+    const accountsReceivable = this.toNumber(salesAgg._sum.due);
+    const accountsPayable = this.toNumber(purchasesAgg._sum.due);
+
+    let totalBankAndCash = bankAccounts.reduce((sum, b) => sum + Number(b.currentBalance || 0), 0);
+    if (totalBankAndCash === 0) {
+      const netCash = Math.max(0, this.toNumber(paymentsInAgg._sum.amount) - this.toNumber(paymentsOutAgg._sum.amount) - expensesTotal);
+      totalBankAndCash = netCash;
+    }
+
+    const rows = [
+      { accountCode: "1001", accountName: "Cash & Bank Balances", classification: "Current Asset", debit: Number(totalBankAndCash.toFixed(2)), credit: 0 },
+      { accountCode: "1002", accountName: "Accounts Receivable (Customer Dues)", classification: "Current Asset", debit: Number(accountsReceivable.toFixed(2)), credit: 0 },
+      { accountCode: "1003", accountName: "Inventory / Stock on Hand", classification: "Current Asset", debit: Number(inventoryValuation.toFixed(2)), credit: 0 },
+      { accountCode: "2001", accountName: "Accounts Payable (Supplier Dues)", classification: "Current Liability", debit: 0, credit: Number(accountsPayable.toFixed(2)) },
+      { accountCode: "4001", accountName: "Sales Revenue", classification: "Revenue", debit: 0, credit: Number(salesTotal.toFixed(2)) },
+      { accountCode: "4002", accountName: "Other Operating Income", classification: "Revenue", debit: 0, credit: Number(incomesTotal.toFixed(2)) },
+      { accountCode: "5001", accountName: "Purchases & Direct Goods", classification: "Direct Expense", debit: Number(purchasesTotal.toFixed(2)), credit: 0 },
+      { accountCode: "5002", accountName: "Operating Expenses (Overheads)", classification: "Indirect Expense", debit: Number(expensesTotal.toFixed(2)), credit: 0 },
+    ];
+
+    const totalDebit = Number(rows.reduce((sum, r) => sum + r.debit, 0).toFixed(2));
+    const totalCredit = Number(rows.reduce((sum, r) => sum + r.credit, 0).toFixed(2));
+    const difference = Number(Math.abs(totalDebit - totalCredit).toFixed(2));
+    const isBalanced = difference === 0;
+
+    return {
+      asOfDate: filters.endDate || new Date().toISOString().slice(0, 10),
+      summary: {
+        totalDebit,
+        totalCredit,
+        difference,
+        isBalanced,
+      },
+      data: rows,
+    };
+  }
+
+  // ==========================================
+  // 15c. CASH FLOW STATEMENT
+  // ==========================================
+  async getCashFlow(filters: ReportFiltersDto) {
+    const dateRange = this.parseDateRange(filters.startDate, filters.endDate);
+
+    const [
+      paymentsInAgg,
+      paymentsOutAgg,
+      salesPaidAgg,
+      purchasesPaidAgg,
+      expensesAgg,
+      incomesAgg,
+      bankAccounts,
+      transfers,
+    ] = await Promise.all([
+      this.prisma.payment.aggregate({
+        where: { deletedAt: null, type: "receive", ...(dateRange && { paymentDate: dateRange }) },
+        _sum: { amount: true },
+        _count: { id: true },
+      }),
+      this.prisma.payment.aggregate({
+        where: { deletedAt: null, type: "pay", ...(dateRange && { paymentDate: dateRange }) },
+        _sum: { amount: true },
+        _count: { id: true },
+      }),
+      this.prisma.sale.aggregate({
+        where: { deletedAt: null, ...(dateRange && { saleDate: dateRange }) },
+        _sum: { paid: true },
+      }),
+      this.prisma.purchase.aggregate({
+        where: { deletedAt: null, ...(dateRange && { purchaseDate: dateRange }) },
+        _sum: { paid: true },
+      }),
+      this.prisma.expense.aggregate({
+        where: { deletedAt: null, ...(dateRange && { expenseDate: dateRange }) },
+        _sum: { amount: true },
+        _count: { id: true },
+      }),
+      this.prisma.income.aggregate({
+        where: { deletedAt: null, ...(dateRange && { incomeDate: dateRange }) },
+        _sum: { amount: true },
+        _count: { id: true },
+      }),
+      this.prisma.bankAccount.findMany({ where: { deletedAt: null } }),
+      this.prisma.moneyTransfer.findMany({
+        where: { deletedAt: null, ...(dateRange && { transferDate: dateRange }) },
+        include: { fromAccount: { select: { accountName: true } }, toAccount: { select: { accountName: true } } },
+        orderBy: { transferDate: "desc" },
+      }),
+    ]);
+
+    const customerPayments = this.toNumber(paymentsInAgg._sum.amount);
+    const salesCash = this.toNumber(salesPaidAgg._sum.paid);
+    const otherIncomes = this.toNumber(incomesAgg._sum.amount);
+    const totalInflow = Number((Math.max(customerPayments, salesCash) + otherIncomes).toFixed(2));
+
+    const supplierPayments = this.toNumber(paymentsOutAgg._sum.amount);
+    const purchasesCash = this.toNumber(purchasesPaidAgg._sum.paid);
+    const expensesTotal = this.toNumber(expensesAgg._sum.amount);
+    const totalOutflow = Number((Math.max(supplierPayments, purchasesCash) + expensesTotal).toFixed(2));
+
+    const netCashFlow = Number((totalInflow - totalOutflow).toFixed(2));
+
+    const breakdown = [
+      { category: "OPERATING INFLOW", title: "Customer Collections & Sales Inflow", amount: Math.max(customerPayments, salesCash), type: "INFLOW" },
+      { category: "OPERATING INFLOW", title: "Miscellaneous & Other Income", amount: otherIncomes, type: "INFLOW" },
+      { category: "OPERATING OUTFLOW", title: "Vendor & Purchase Outflow", amount: Math.max(supplierPayments, purchasesCash), type: "OUTFLOW" },
+      { category: "OPERATING OUTFLOW", title: "Operating Expenses & Overheads", amount: expensesTotal, type: "OUTFLOW" },
+    ];
+
+    return {
+      asOfDate: filters.endDate || new Date().toISOString().slice(0, 10),
+      summary: {
+        totalInflow,
+        totalOutflow,
+        netCashFlow,
+        bankAccountsTotal: bankAccounts.reduce((sum, b) => sum + Number(b.currentBalance || 0), 0),
+      },
+      breakdown,
+      bankAccounts: bankAccounts.map((b) => ({
+        id: b.id,
+        name: b.accountName,
+        type: b.accountType,
+        balance: Number(b.currentBalance),
+      })),
+      recentTransfers: transfers.map((t) => ({
+        id: t.id,
+        date: t.transferDate,
+        fromAccount: t.fromAccount.accountName,
+        toAccount: t.toAccount.accountName,
+        amount: Number(t.amount),
+        reference: t.reference,
+      })),
+    };
+  }
+
+    // ==========================================
   // 16. INVOICE REPORT
   // ==========================================
   async getInvoiceReport(filters: ReportFiltersDto) {
