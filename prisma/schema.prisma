@@ -1031,3 +1031,195 @@ model RefreshToken {
 
   user User @relation(fields: [userId], references: [id])
 }
+
+// ==========================================
+// HRM (HUMAN RESOURCE MANAGEMENT)
+// ==========================================
+
+model Department {
+  id          Int       @id @default(autoincrement())
+  name        String
+  code        String    @unique
+  description String?
+  managerName String?
+  status      String    @default("ACTIVE")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  version     Int       @default(1)
+  deviceId    String?
+
+  designations Designation[]
+  employees    Employee[]
+}
+
+model Designation {
+  id             Int       @id @default(autoincrement())
+  name           String
+  code           String    @unique
+  departmentId   Int?
+  departmentName String?
+  description    String?
+  status         String    @default("ACTIVE")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+  version        Int       @default(1)
+  deviceId       String?
+
+  department Department? @relation(fields: [departmentId], references: [id])
+  employees  Employee[]
+}
+
+model Shift {
+  id                   Int       @id @default(autoincrement())
+  name                 String
+  code                 String    @unique
+  startTime            String
+  endTime              String
+  lateToleranceMinutes Int       @default(15)
+  breakDurationMinutes Int       @default(60)
+  status               String    @default("ACTIVE")
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  deletedAt            DateTime?
+  version              Int       @default(1)
+  deviceId             String?
+
+  employees Employee[]
+}
+
+model Employee {
+  id               Int       @id @default(autoincrement())
+  employeeCode     String    @unique
+  firstName        String
+  lastName         String
+  email            String
+  phone            String
+  departmentId     Int?
+  departmentName   String?
+  designationId    Int?
+  designationName  String?
+  shiftId          Int?
+  shiftName        String?
+  joiningDate      DateTime  @default(now())
+  salary           Float     @default(0)
+  employmentType   String    @default("FULL_TIME")
+  status           String    @default("ACTIVE")
+  address          String?
+  emergencyContact String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deletedAt        DateTime?
+  version          Int       @default(1)
+  deviceId         String?
+
+  department    Department?    @relation(fields: [departmentId], references: [id])
+  designation   Designation?   @relation(fields: [designationId], references: [id])
+  shift         Shift?         @relation(fields: [shiftId], references: [id])
+  attendances   Attendance[]
+  leaveRequests LeaveRequest[]
+  payrolls      Payroll[]
+}
+
+model Attendance {
+  id             Int       @id @default(autoincrement())
+  employeeId     Int
+  employeeName   String?
+  departmentName String?
+  date           DateTime
+  clockIn        String?
+  clockOut       String?
+  status         String    @default("PRESENT")
+  totalHours     Float?
+  notes          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+  version        Int       @default(1)
+  deviceId       String?
+
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  @@index([employeeId, date])
+}
+
+model LeaveType {
+  id          Int       @id @default(autoincrement())
+  name        String
+  daysAllowed Int       @default(12)
+  description String?
+  status      String    @default("ACTIVE")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  version     Int       @default(1)
+  deviceId    String?
+
+  leaveRequests LeaveRequest[]
+}
+
+model LeaveRequest {
+  id             Int       @id @default(autoincrement())
+  employeeId     Int
+  employeeName   String?
+  departmentName String?
+  leaveTypeId    Int
+  leaveTypeName  String?
+  startDate      DateTime
+  endDate        DateTime
+  days           Int       @default(1)
+  reason         String
+  status         String    @default("PENDING")
+  approvedBy     String?
+  appliedAt      DateTime  @default(now())
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+  version        Int       @default(1)
+  deviceId       String?
+
+  employee  Employee  @relation(fields: [employeeId], references: [id])
+  leaveType LeaveType @relation(fields: [leaveTypeId], references: [id])
+}
+
+model Holiday {
+  id          Int       @id @default(autoincrement())
+  name        String
+  date        DateTime
+  type        String    @default("PUBLIC")
+  description String?
+  status      String    @default("ACTIVE")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  version     Int       @default(1)
+  deviceId    String?
+}
+
+model Payroll {
+  id              Int       @id @default(autoincrement())
+  employeeId      Int
+  employeeName    String?
+  departmentName  String?
+  designationName String?
+  month           String
+  year            Int
+  basicSalary     Float     @default(0)
+  allowances      Float     @default(0)
+  deductions      Float     @default(0)
+  netSalary       Float     @default(0)
+  paymentDate     DateTime?
+  paymentMethod   String?
+  status          String    @default("PENDING")
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+  version         Int       @default(1)
+  deviceId        String?
+
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  @@index([employeeId, month, year])
+}
