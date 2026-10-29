@@ -46,7 +46,10 @@ export class AuthService {
 
   async login(user: any, deviceId?: string) {
     const payload = { sub: user.id, username: user.username };
-    const permissions = user.role.permissions.map((p) => p.permission.action);
+    const permissions = user.role?.permissions?.map((p: any) => p.permission?.action || p.action || p) || [];
+    if (user.role?.name === "Super Admin" && !permissions.includes("*")) {
+      permissions.push("*");
+    }
 
     const accessToken = this.jwtService.sign(payload);
     const refreshToken = crypto.randomUUID(); // Simple unique string for refresh token
