@@ -38,6 +38,7 @@ import { PurchaseOrdersModule } from "./modules/purchase-orders/purchase-orders.
 import { SaleReturnsModule } from "./modules/sale-returns/sale-returns.module";
 import { PurchaseReturnsModule } from "./modules/purchase-returns/purchase-returns.module";
 import { DashboardModule } from "./modules/dashboard/dashboard.module";
+import { HrmModule } from "./modules/hrm/hrm.module";
 
 // We will import feature modules here
 
@@ -88,6 +89,7 @@ import { DashboardModule } from "./modules/dashboard/dashboard.module";
     SaleReturnsModule,
     PurchaseReturnsModule,
     DashboardModule,
+    HrmModule,
     // Add other feature modules here as they are developed
   ],
   providers: [
