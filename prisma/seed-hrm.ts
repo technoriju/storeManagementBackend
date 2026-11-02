@@ -90,24 +90,6 @@ async function main() {
     }
   }
   console.log('Holidays seeded.');
-
-  // 6. Employees
-  const emps = [
-    { employeeCode: 'EMP-001', firstName: 'Alex', lastName: 'Morgan', email: 'alex.morgan@example.com', phone: '+1 555-0101', departmentId: 1, departmentName: 'Sales & Marketing', designationId: 1, designationName: 'Sales Executive', shiftId: 1, shiftName: 'Morning General', salary: 45000, employmentType: 'FULL_TIME', status: 'ACTIVE', address: '123 Market Street, Suite 4', emergencyContact: '+1 555-9001' },
-    { employeeCode: 'EMP-002', firstName: 'David', lastName: 'Miller', email: 'david.miller@example.com', phone: '+1 555-0102', departmentId: 2, departmentName: 'Accounts & Finance', designationId: 2, designationName: 'Senior Accountant', shiftId: 1, shiftName: 'Morning General', salary: 58000, employmentType: 'FULL_TIME', status: 'ACTIVE', address: '456 Financial Ave', emergencyContact: '+1 555-9002' },
-    { employeeCode: 'EMP-003', firstName: 'Rachel', lastName: 'Green', email: 'rachel.green@example.com', phone: '+1 555-0103', departmentId: 3, departmentName: 'Inventory & Warehouse', designationId: 3, designationName: 'Warehouse Manager', shiftId: 1, shiftName: 'Morning General', salary: 52000, employmentType: 'FULL_TIME', status: 'ACTIVE', address: '789 Logistics Way', emergencyContact: '+1 555-9003' },
-    { employeeCode: 'EMP-004', firstName: 'James', lastName: 'Wilson', email: 'james.wilson@example.com', phone: '+1 555-0104', departmentId: 4, departmentName: 'Human Resources', designationId: 4, designationName: 'HR Executive', shiftId: 1, shiftName: 'Morning General', salary: 48000, employmentType: 'FULL_TIME', status: 'ACTIVE', address: '321 People Blvd', emergencyContact: '+1 555-9004' },
-    { employeeCode: 'EMP-005', firstName: 'Sophia', lastName: 'Taylor', email: 'sophia.taylor@example.com', phone: '+1 555-0105', departmentId: 1, departmentName: 'Sales & Marketing', designationId: 5, designationName: 'Store Supervisor', shiftId: 2, shiftName: 'Early Shift', salary: 42000, employmentType: 'FULL_TIME', status: 'ON_LEAVE', address: '654 Retail Road', emergencyContact: '+1 555-9005' },
-  ];
-
-  for (const e of emps) {
-    await prisma.employee.upsert({
-      where: { employeeCode: e.employeeCode },
-      update: e,
-      create: e,
-    });
-  }
-  console.log('Employees seeded.');
 }
 
 main()

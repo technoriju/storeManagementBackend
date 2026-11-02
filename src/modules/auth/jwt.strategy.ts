@@ -37,12 +37,17 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException();
     }
 
-    const permissions = user.role.permissions.map((p) => p.permission.action);
+    const permissions = user.role?.permissions?.map((p) => p.permission.action) || [];
+    if (user.role?.name === "Super Admin" && !permissions.includes("*")) {
+      permissions.push("*");
+    }
 
     return {
       id: user.id,
       username: user.username,
-      role: user.role.name,
+      fullName: user.fullName,
+      email: user.email,
+      role: user.role?.name,
       permissions,
       companyId: user.companyId,
       branchId: user.branchId,

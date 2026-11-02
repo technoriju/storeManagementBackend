@@ -101,6 +101,14 @@ export class AuthController {
   }
 
   @ApiBearerAuth()
+  @ApiOperation({ summary: "Get current user profile and permissions" })
+  @UseGuards(JwtAuthGuard)
+  @Get("me")
+  async getProfile(@Request() req: any) {
+    return req.user;
+  }
+
+  @ApiBearerAuth()
   @ApiOperation({ summary: "Get all permissions" })
   @UseGuards(JwtAuthGuard)
   @Get("permissions")
