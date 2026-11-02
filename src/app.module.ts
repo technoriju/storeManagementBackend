@@ -40,6 +40,7 @@ import { PurchaseReturnsModule } from "./modules/purchase-returns/purchase-retur
 import { DashboardModule } from "./modules/dashboard/dashboard.module";
 import { HrmModule } from "./modules/hrm/hrm.module";
 import { BarcodeModule } from "./modules/barcode/barcode.module";
+import { SettingsModule } from "./modules/settings/settings.module";
 
 // We will import feature modules here
 
@@ -92,6 +93,7 @@ import { BarcodeModule } from "./modules/barcode/barcode.module";
     DashboardModule,
     HrmModule,
     BarcodeModule,
+    SettingsModule,
     // Add other feature modules here as they are developed
   ],
   providers: [

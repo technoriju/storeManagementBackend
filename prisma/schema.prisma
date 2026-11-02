@@ -977,6 +977,18 @@ model InvoiceTemplateSetting {
   template InvoiceTemplate @relation(fields: [templateId], references: [id])
 }
 
+model Setting {
+  id        Int       @id @default(autoincrement())
+  key       String    @unique
+  value     String?   @db.Text
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  version   Int       @default(1)
+  deviceId  String?
+}
+
 // ==========================================
 // SYNC LOGIC & AUDIT
 // ==========================================
