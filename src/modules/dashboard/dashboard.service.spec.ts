@@ -80,4 +80,50 @@ describe("DashboardService", () => {
     const secondCall = await service.getMetrics();
     expect(firstCall).toEqual(secondCall);
   });
+
+  it("should calculate profit by comparing sales with purchase price", async () => {
+    service.clearCache();
+    (mockPrisma.sale.aggregate as jest.Mock).mockResolvedValueOnce({
+      _sum: { grandTotal: 1000 },
+      _count: { id: 2 },
+    });
+    (mockPrisma.saleItem.findMany as jest.Mock).mockResolvedValueOnce([
+      {
+        quantity: 5,
+        unitPrice: 100,
+        total: 500,
+        product: { purchasePrice: 60, prices: [], purchaseItems: [] },
+      },
+      {
+        quantity: 2,
+        unitPrice: 250,
+        total: 500,
+        product: { purchasePrice: null, prices: [{ priceType: "PURCHASE", price: 150 }] },
+      },
+    ]);
+
+    const metrics = await service.getMetrics();
+    expect(metrics.todaySales).toBe(1000);
+    expect(metrics.todayCogs).toBe(600);
+    expect(metrics.profit).toBe(400);
+    expect(metrics.profitMargin).toBe(40);
+  });
+
+  it("should filter metrics by specific date when date argument is provided", async () => {
+    service.clearCache();
+    const res = await service.getMetrics(undefined, "2026-10-15");
+    expect(res.selectedDate).toBe("2026-10-15");
+    expect(mockPrisma.sale.aggregate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          OR: expect.arrayContaining([
+            expect.objectContaining({
+              saleDate: expect.any(Object),
+            }),
+          ]),
+          status: { not: "CANCELLED" },
+        }),
+      })
+    );
+  });
 });
