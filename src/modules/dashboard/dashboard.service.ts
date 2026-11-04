@@ -19,8 +19,8 @@ export class DashboardService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async getMetrics(branchId?: number): Promise<DashboardMetricsDto> {
-    const cacheKey = `dashboard_${branchId || "all"}`;
+  async getMetrics(branchId?: number, dateStr?: string): Promise<DashboardMetricsDto> {
+    const cacheKey = `dashboard_${branchId || "all"}_${dateStr || "today"}`;
     const cached = this.cache.get(cacheKey);
     const nowMs = Date.now();
 
@@ -28,16 +28,37 @@ export class DashboardService {
       return cached.data;
     }
 
-    const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-    const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    let targetDate = new Date();
+    let yr = targetDate.getFullYear();
+    let mo = targetDate.getMonth();
+    let da = targetDate.getDate();
 
-    // 7 days ago
+    if (dateStr && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      const [y, m, d] = dateStr.split("-").map(Number);
+      yr = y;
+      mo = m - 1;
+      da = d;
+      targetDate = new Date(yr, mo, da, 12, 0, 0);
+    }
+
+    // Local day window
+    const localStart = new Date(yr, mo, da, 0, 0, 0, 0);
+    const localEnd = new Date(yr, mo, da, 23, 59, 59, 999);
+
+    // UTC day window
+    const utcStart = new Date(Date.UTC(yr, mo, da, 0, 0, 0, 0));
+    const utcEnd = new Date(Date.UTC(yr, mo, da, 23, 59, 59, 999));
+
+    // Wide window covering both local and UTC boundaries
+    const todayStart = new Date(Math.min(localStart.getTime(), utcStart.getTime()));
+    const todayEnd = new Date(Math.max(localEnd.getTime(), utcEnd.getTime()));
+
+    // 7 days ago from target date
     const sevenDaysAgo = new Date(todayStart);
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
 
-    // 6 months ago (start of month)
-    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1, 0, 0, 0, 0);
+    // 6 months ago (start of month) from target date
+    const sixMonthsAgo = new Date(targetDate.getFullYear(), targetDate.getMonth() - 5, 1, 0, 0, 0, 0);
 
     const branchFilter = branchId ? { branchId } : {};
 
@@ -64,11 +85,14 @@ export class DashboardService {
         lowStockCount,
         customerSalesGroups,
       ] = await Promise.all([
-        // 1. Today's sales
+        // 1. Today's sales (matching saleDate or createdAt in window)
         this.prisma.sale.aggregate({
           where: {
             ...branchFilter,
-            saleDate: { gte: todayStart, lte: todayEnd },
+            OR: [
+              { saleDate: { gte: todayStart, lte: todayEnd } },
+              { createdAt: { gte: todayStart, lte: todayEnd } },
+            ],
             status: { not: "CANCELLED" },
           },
           _sum: { grandTotal: true },
@@ -78,11 +102,14 @@ export class DashboardService {
           return { _sum: { grandTotal: 0 }, _count: { id: 0 } };
         }),
 
-        // 2. Today's purchases
+        // 2. Today's purchases (matching purchaseDate or createdAt)
         this.prisma.purchase.aggregate({
           where: {
             ...branchFilter,
-            purchaseDate: { gte: todayStart, lte: todayEnd },
+            OR: [
+              { purchaseDate: { gte: todayStart, lte: todayEnd } },
+              { createdAt: { gte: todayStart, lte: todayEnd } },
+            ],
             status: { not: "CANCELLED" },
           },
           _sum: { grandTotal: true },
@@ -91,11 +118,14 @@ export class DashboardService {
           return { _sum: { grandTotal: 0 } };
         }),
 
-        // 3. Today's expenses
+        // 3. Today's expenses (matching expenseDate or createdAt)
         this.prisma.expense.aggregate({
           where: {
             ...branchFilter,
-            expenseDate: { gte: todayStart, lte: todayEnd },
+            OR: [
+              { expenseDate: { gte: todayStart, lte: todayEnd } },
+              { createdAt: { gte: todayStart, lte: todayEnd } },
+            ],
             deletedAt: null,
           },
           _sum: { amount: true },
@@ -104,18 +134,40 @@ export class DashboardService {
           return { _sum: { amount: 0 } };
         }),
 
-        // 4. Today's COGS for profit
+        // 4. Today's COGS for profit (comparing sales items with purchase price)
         this.prisma.saleItem.findMany({
           where: {
             sale: {
               ...branchFilter,
-              saleDate: { gte: todayStart, lte: todayEnd },
+              OR: [
+                { saleDate: { gte: todayStart, lte: todayEnd } },
+                { createdAt: { gte: todayStart, lte: todayEnd } },
+              ],
               status: { not: "CANCELLED" },
             },
           },
           select: {
             quantity: true,
-            product: { select: { purchasePrice: true } },
+            unitPrice: true,
+            total: true,
+            productUnitId: true,
+            productUnit: { select: { conversionFactor: true } },
+            product: {
+              select: {
+                purchasePrice: true,
+                conversionRate: true,
+                defaultSalesUnitId: true,
+                prices: {
+                  where: { priceType: "PURCHASE" },
+                  select: { price: true, productUnitId: true },
+                },
+                purchaseItems: {
+                  take: 1,
+                  orderBy: { id: "desc" },
+                  select: { unitPrice: true },
+                },
+              },
+            },
           },
         }).catch(() => []),
 
@@ -264,14 +316,72 @@ export class DashboardService {
       const todayPurchases = Number(todayPurchasesAgg._sum?.grandTotal || 0);
       const expenses = Number(todayExpensesAgg._sum?.amount || 0);
 
-      // Calculate COGS and profit
+      // Calculate COGS and profit based on sales items vs purchase price
       let todayCogs = 0;
       for (const item of todayCogsAgg) {
         const qty = Number(item.quantity || 0);
-        const cost = Number(item.product?.purchasePrice || 0);
-        todayCogs += qty * cost;
+
+        // Find purchase price
+        let purchasePrice = null;
+        if (item.productUnitId && item.product?.prices?.length) {
+          const match = item.product.prices.find((p) => String(p.productUnitId) === String(item.productUnitId));
+          if (match && match.price !== null) {
+            purchasePrice = Number(match.price);
+          }
+        }
+
+        if (purchasePrice === null && item.product?.purchasePrice !== null && item.product?.purchasePrice !== undefined) {
+          const basePp = Number(item.product.purchasePrice);
+          if (basePp > 0) {
+            purchasePrice = basePp;
+          }
+        }
+
+        if (purchasePrice === null && item.product?.prices?.length) {
+          const anyPp = item.product.prices.find((p) => p.price !== null);
+          if (anyPp) {
+            purchasePrice = Number(anyPp.price);
+          }
+        }
+
+        if (purchasePrice === null && item.product?.purchaseItems?.length) {
+          const lastPur = item.product.purchaseItems[0];
+          if (lastPur?.unitPrice !== null && lastPur?.unitPrice !== undefined) {
+            purchasePrice = Number(lastPur.unitPrice);
+          }
+        }
+
+        let unitCost = purchasePrice !== null ? purchasePrice : 0;
+
+        // Apply unit conversion factor
+        if (item.productUnit?.conversionFactor) {
+          const factor = Number(item.productUnit.conversionFactor);
+          if (factor > 0 && factor !== 1) {
+            unitCost = unitCost * factor;
+          }
+        }
+
+        // Subunit auto-detection when product has conversionRate > 1 (e.g. 1 Box = 20 Pcs, 1 Kg = 1000 Grams)
+        const convRate = Number(item.product?.conversionRate || 1);
+        if (convRate > 1) {
+          const subCost = unitCost / convRate;
+          const soldUnitPrice = Number(item.unitPrice || 0);
+          if (
+            (item.productUnitId && item.product?.defaultSalesUnitId && String(item.productUnitId) === String(item.product.defaultSalesUnitId)) ||
+            (soldUnitPrice > 0 && (soldUnitPrice < unitCost * 0.6 || (soldUnitPrice <= subCost * 3 && unitCost > subCost)))
+          ) {
+            unitCost = subCost;
+          }
+        }
+
+        todayCogs += qty * unitCost;
       }
-      const profit = Math.round((todaySales - todayCogs - expenses) * 100) / 100;
+      todayCogs = Math.round(todayCogs * 100) / 100;
+
+      // Profit on sales compared with purchase price (Gross Profit)
+      const profit = Math.round((todaySales - todayCogs) * 100) / 100;
+      const netProfit = Math.round((profit - expenses) * 100) / 100;
+      const profitMargin = todaySales > 0 ? Math.round(((profit / todaySales) * 100) * 10) / 10 : 0;
 
       // Calculate Stock Value
       let currentStockValue = 0;
@@ -362,7 +472,7 @@ export class DashboardService {
       ];
       const monthlyMap = new Map<string, { label: string; sales: number; purchase: number }>();
       for (let i = 5; i >= 0; i--) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const d = new Date(targetDate.getFullYear(), targetDate.getMonth() - i, 1);
         const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
         monthlyMap.set(key, {
           label: monthNames[d.getMonth()],
@@ -398,11 +508,15 @@ export class DashboardService {
       );
 
       const metrics: DashboardMetricsDto = {
+        selectedDate: dateStr || todayStart.toISOString().split("T")[0],
         todaySales: Math.round(todaySales * 100) / 100,
         todayPurchases: Math.round(todayPurchases * 100) / 100,
+        todayCogs,
         currentStockValue: Math.round(currentStockValue * 100) / 100,
         outstanding: Math.round(Number(customersOutstandingAgg._sum?.outstandingBalance || 0) * 100) / 100,
         profit,
+        netProfit,
+        profitMargin,
         expenses: Math.round(expenses * 100) / 100,
         todayOrdersCount,
         totalSales: Math.round(Number(totalSalesAgg._sum?.grandTotal || 0) * 100) / 100,
@@ -433,7 +547,12 @@ export class DashboardService {
 
   clearCache(branchId?: number) {
     if (branchId) {
-      this.cache.delete(`dashboard_${branchId}`);
+      const prefix = `dashboard_${branchId}_`;
+      for (const k of this.cache.keys()) {
+        if (k.startsWith(prefix) || k === `dashboard_${branchId}`) {
+          this.cache.delete(k);
+        }
+      }
     } else {
       this.cache.clear();
     }

@@ -13,9 +13,16 @@ export class DashboardController {
 
   @ApiOperation({ summary: "Get aggregated dashboard metrics for sales, purchases, stock, and charts" })
   @ApiQuery({ name: "branchId", required: false, type: Number })
+  @ApiQuery({ name: "date", required: false, type: String, description: "Filter by date (YYYY-MM-DD)" })
   @Get("metrics")
-  async getMetrics(@Query("branchId") branchId?: string): Promise<DashboardMetricsDto> {
+  async getMetrics(
+    @Query("branchId") branchId?: string,
+    @Query("date") date?: string,
+  ): Promise<DashboardMetricsDto> {
     const branchIdNum = branchId ? parseInt(branchId, 10) : undefined;
-    return this.dashboardService.getMetrics(isNaN(branchIdNum as number) ? undefined : branchIdNum);
+    return this.dashboardService.getMetrics(
+      isNaN(branchIdNum as number) ? undefined : branchIdNum,
+      date,
+    );
   }
 }

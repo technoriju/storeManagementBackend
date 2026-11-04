@@ -19,11 +19,15 @@ export interface CustomerDistributionDto {
 }
 
 export interface DashboardMetricsDto {
+  selectedDate?: string;
   todaySales: number;
   todayPurchases: number;
+  todayCogs?: number;
   currentStockValue: number;
   outstanding: number;
   profit: number;
+  netProfit?: number;
+  profitMargin?: number;
   expenses: number;
   todayOrdersCount: number;
   totalSales: number;
