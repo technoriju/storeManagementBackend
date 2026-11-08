@@ -34,7 +34,7 @@ export class ReportsService {
 
   private getPagination(pageParam?: number, limitParam?: number) {
     const page = Math.max(1, Number(pageParam) || 1);
-    const limit = Math.max(1, Math.min(500, Number(limitParam) || 10));
+    const limit = Math.max(1, Math.min(10000, Number(limitParam) || 10));
     const skip = (page - 1) * limit;
     return { page, limit, skip };
   }

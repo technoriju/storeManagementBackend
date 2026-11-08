@@ -400,14 +400,26 @@ export class SalesService {
       const categoryName = prod.category?.name ?? null;
       const subCategoryName = prod.subCategory?.name ?? null;
 
+      const cRate = Number(item.conversionRate ?? prod.conversionRate ?? item.productUnit?.conversionFactor ?? 1);
+      const isSubUnit =
+        (item.unitType === 'sub') ||
+        (item.productUnit?.unit?.name && subUnitName && item.productUnit.unit.name.toLowerCase() === subUnitName.toLowerCase()) ||
+        (item.unit && subUnitName && item.unit.toLowerCase() === subUnitName.toLowerCase()) ||
+        (cRate > 1 && subUnitName && prod.retailPrice && Math.abs(Number(item.unitPrice) - (Number(prod.retailPrice) / cRate)) < 0.1) ||
+        (cRate > 1 && subUnitName && prod.wholesalePrice && Math.abs(Number(item.unitPrice) - (Number(prod.wholesalePrice) / cRate)) < 0.1);
+
+      const effectiveUnit = isSubUnit ? (subUnitName || 'Pcs') : (item.productUnit?.unit?.name || unitName || 'Unit');
+      const effectiveUnitType = isSubUnit ? 'sub' : 'base';
+
       return {
         ...item,
-        unitName: item.unitName ?? (item.productUnit?.unit?.name || unitName),
-        unit: item.unit ?? (item.productUnit?.unit?.name || unitName),
+        unitName: effectiveUnit,
+        unit: effectiveUnit,
+        unitType: effectiveUnitType,
         baseUnitName: unitName,
         brandName: item.brandName ?? brandName,
         subUnitName: item.subUnitName ?? subUnitName,
-        conversionRate: item.conversionRate !== undefined ? Number(item.conversionRate) : (prod.conversionRate ? Number(prod.conversionRate) : (item.productUnit?.conversionFactor ? Number(item.productUnit.conversionFactor) : undefined)),
+        conversionRate: cRate,
         product: {
           ...prod,
           unitName,
