@@ -35,22 +35,27 @@ export class ReportFiltersDto {
   endDate?: string;
 
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   productId?: number;
 
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   categoryId?: number;
 
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   brandId?: number;
 
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   customerId?: number;
 
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   supplierId?: number;
 
@@ -59,14 +64,17 @@ export class ReportFiltersDto {
   paymentMethod?: string;
 
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   userId?: number;
 
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   branchId?: number;
 
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   warehouseId?: number;
 
