@@ -110,9 +110,12 @@ export class SyncService {
       "category",
       "sale",
       "purchase",
+      "salereturn",
+      "purchasereturn",
       "customer",
       "supplier",
       "payment",
+      "stockbalance",
     ];
 
     for (const table of tables) {
@@ -140,7 +143,7 @@ export class SyncService {
   }
 
   private getModel(entityType: string): any {
-    const type = entityType.toLowerCase();
+    const type = entityType.toLowerCase().replace(/_/g, "");
     switch (type) {
       case "product":
         return this.prisma.product;
@@ -150,12 +153,20 @@ export class SyncService {
         return this.prisma.sale;
       case "purchase":
         return this.prisma.purchase;
+      case "salereturn":
+        return this.prisma.saleReturn;
+      case "purchasereturn":
+        return this.prisma.purchaseReturn;
       case "customer":
         return this.prisma.customer;
       case "supplier":
         return this.prisma.supplier;
       case "payment":
         return this.prisma.payment;
+      case "stockbalance":
+        return this.prisma.stockBalance;
+      case "stocktransaction":
+        return this.prisma.stockTransaction;
       default:
         return null;
     }

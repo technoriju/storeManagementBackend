@@ -118,6 +118,33 @@ export class PurchaseReturnsService {
         }
       }
 
+      // 4. Update parent purchase due and payment status
+      const allReturns = await tx.purchaseReturn.findMany({
+        where: { purchaseId: purchaseIdBigInt, deletedAt: null },
+        select: { totalAmount: true },
+      });
+      const totalReturned = allReturns.reduce((sum, r) => sum + Number(r.totalAmount || 0), 0);
+      const originalGrandTotal = Number(purchase.grandTotal || 0);
+      const paidAmt = Number(purchase.paid || 0);
+      const effectiveTotal = Math.max(0, originalGrandTotal - totalReturned);
+      const newDue = Math.max(0, Number((effectiveTotal - paidAmt).toFixed(2)));
+      let newPayStatus = purchase.paymentStatus;
+      if (newDue === 0 && (paidAmt > 0 || effectiveTotal === 0)) {
+        newPayStatus = "Paid";
+      } else if (paidAmt > 0) {
+        newPayStatus = "Partial";
+      } else {
+        newPayStatus = "Unpaid";
+      }
+
+      await tx.purchase.update({
+        where: { id: purchaseIdBigInt },
+        data: {
+          due: newDue,
+          paymentStatus: newPayStatus,
+        },
+      });
+
       if (purchase.supplierId) {
         await recalculateSupplierBalance(tx, purchase.supplierId);
       }
@@ -153,13 +180,46 @@ export class PurchaseReturnsService {
 
   async remove(id: bigint) {
     const item = await this.findOne(id);
-    const result = await this.prisma.purchaseReturn.update({
-      where: { id },
-      data: { deletedAt: new Date() },
+    return this.prisma.$transaction(async (tx) => {
+      const result = await tx.purchaseReturn.update({
+        where: { id },
+        data: { deletedAt: new Date() },
+      });
+
+      // Recalculate parent purchase due and payment status after return removal
+      const allReturns = await tx.purchaseReturn.findMany({
+        where: { purchaseId: item.purchaseId, deletedAt: null },
+        select: { totalAmount: true },
+      });
+      const totalReturned = allReturns.reduce((sum, r) => sum + Number(r.totalAmount || 0), 0);
+      const currentPurchase = await tx.purchase.findUnique({ where: { id: item.purchaseId } });
+      if (currentPurchase) {
+        const originalGrandTotal = Number(currentPurchase.grandTotal || 0);
+        const paidAmt = Number(currentPurchase.paid || 0);
+        const effectiveTotal = Math.max(0, originalGrandTotal - totalReturned);
+        const newDue = Math.max(0, Number((effectiveTotal - paidAmt).toFixed(2)));
+        let newPayStatus = currentPurchase.paymentStatus;
+        if (newDue === 0 && (paidAmt > 0 || effectiveTotal === 0)) {
+          newPayStatus = "Paid";
+        } else if (paidAmt > 0) {
+          newPayStatus = "Partial";
+        } else {
+          newPayStatus = "Unpaid";
+        }
+
+        await tx.purchase.update({
+          where: { id: item.purchaseId },
+          data: {
+            due: newDue,
+            paymentStatus: newPayStatus,
+          },
+        });
+      }
+
+      if (item.purchase?.supplierId) {
+        await recalculateSupplierBalance(tx, item.purchase.supplierId);
+      }
+      return result;
     });
-    if (item.purchase?.supplierId) {
-      await recalculateSupplierBalance(this.prisma, item.purchase.supplierId);
-    }
-    return result;
   }
 }
