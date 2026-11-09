@@ -118,7 +118,34 @@ export class SaleReturnsService {
         }
       }
 
-      // 4. Update customer outstanding balance if attached to sale
+      // 4. Update parent sale due and payment status
+      const allReturns = await tx.saleReturn.findMany({
+        where: { saleId: saleIdBigInt, deletedAt: null },
+        select: { totalAmount: true },
+      });
+      const totalReturned = allReturns.reduce((sum, r) => sum + Number(r.totalAmount || 0), 0);
+      const originalGrandTotal = Number(sale.grandTotal || 0);
+      const paidAmt = Number(sale.paid || 0);
+      const effectiveTotal = Math.max(0, originalGrandTotal - totalReturned);
+      const newDue = Math.max(0, Number((effectiveTotal - paidAmt).toFixed(2)));
+      let newPayStatus = sale.paymentStatus;
+      if (newDue === 0 && (paidAmt > 0 || effectiveTotal === 0)) {
+        newPayStatus = "Paid";
+      } else if (paidAmt > 0) {
+        newPayStatus = "Partial";
+      } else {
+        newPayStatus = "Unpaid";
+      }
+
+      await tx.sale.update({
+        where: { id: saleIdBigInt },
+        data: {
+          due: newDue,
+          paymentStatus: newPayStatus,
+        },
+      });
+
+      // 5. Update customer outstanding balance if attached to sale
       if (sale.customerId) {
         await recalculateCustomerBalance(tx, sale.customerId);
       }
@@ -154,13 +181,46 @@ export class SaleReturnsService {
 
   async remove(id: bigint) {
     const item = await this.findOne(id);
-    const result = await this.prisma.saleReturn.update({
-      where: { id },
-      data: { deletedAt: new Date() },
+    return this.prisma.$transaction(async (tx) => {
+      const result = await tx.saleReturn.update({
+        where: { id },
+        data: { deletedAt: new Date() },
+      });
+
+      // Recalculate parent sale due and payment status after return removal
+      const allReturns = await tx.saleReturn.findMany({
+        where: { saleId: item.saleId, deletedAt: null },
+        select: { totalAmount: true },
+      });
+      const totalReturned = allReturns.reduce((sum, r) => sum + Number(r.totalAmount || 0), 0);
+      const currentSale = await tx.sale.findUnique({ where: { id: item.saleId } });
+      if (currentSale) {
+        const originalGrandTotal = Number(currentSale.grandTotal || 0);
+        const paidAmt = Number(currentSale.paid || 0);
+        const effectiveTotal = Math.max(0, originalGrandTotal - totalReturned);
+        const newDue = Math.max(0, Number((effectiveTotal - paidAmt).toFixed(2)));
+        let newPayStatus = currentSale.paymentStatus;
+        if (newDue === 0 && (paidAmt > 0 || effectiveTotal === 0)) {
+          newPayStatus = "Paid";
+        } else if (paidAmt > 0) {
+          newPayStatus = "Partial";
+        } else {
+          newPayStatus = "Unpaid";
+        }
+
+        await tx.sale.update({
+          where: { id: item.saleId },
+          data: {
+            due: newDue,
+            paymentStatus: newPayStatus,
+          },
+        });
+      }
+
+      if (item.sale?.customerId) {
+        await recalculateCustomerBalance(tx, item.sale.customerId);
+      }
+      return result;
     });
-    if (item.sale?.customerId) {
-      await recalculateCustomerBalance(this.prisma, item.sale.customerId);
-    }
-    return result;
   }
 }
