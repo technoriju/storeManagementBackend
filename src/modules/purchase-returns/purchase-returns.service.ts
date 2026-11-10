@@ -43,13 +43,13 @@ export class PurchaseReturnsService {
         }
 
         const conversionFactor = pu ? Number(pu.conversionFactor || 1) : 1;
-        const baseQuantity = item.quantity * conversionFactor;
+        const baseQuantity = Number(item.quantity) * conversionFactor;
 
         resolvedItems.push({
           ...item,
           productId: prodId,
           productUnitId: pu ? pu.id : null,
-          unitId: product.baseUnitId,
+          unitId: pu?.unitId ?? (product.baseUnitId || 1),
           baseQuantity,
         });
       }
@@ -66,25 +66,31 @@ export class PurchaseReturnsService {
             create: resolvedItems.map((item) => ({
               productId: item.productId,
               productUnitId: item.productUnitId,
-              quantity: item.quantity,
-              unitPrice: item.unitPrice,
-              taxAmount: item.taxAmount || 0,
-              discount: item.discount || 0,
-              total: item.total,
+              quantity: Number(item.quantity),
+              unitPrice: Number(item.unitPrice),
+              taxAmount: Number(item.taxAmount || 0),
+              discount: Number(item.discount || 0),
+              total: Number(item.total),
             })),
           },
         },
         include: { items: { include: { product: true } }, purchase: true },
       });
 
-      // 3. Deduct stock from warehouse inventory (returned back to supplier if warehouse present)
-      if (purchase.warehouseId) {
+      // 3. Deduct stock from warehouse inventory (returned back to supplier)
+      let resolvedWarehouseId = purchase.warehouseId;
+      if (!resolvedWarehouseId) {
+        const defaultWh = await tx.warehouse.findFirst({ where: { deletedAt: null } }) || (await tx.warehouse.findFirst());
+        resolvedWarehouseId = defaultWh ? defaultWh.id : null;
+      }
+
+      if (resolvedWarehouseId) {
         for (const item of resolvedItems) {
           const existingStock = await tx.stockBalance.findUnique({
             where: {
               productId_warehouseId: {
                 productId: item.productId,
-                warehouseId: purchase.warehouseId,
+                warehouseId: resolvedWarehouseId,
               },
             },
           });
@@ -98,7 +104,7 @@ export class PurchaseReturnsService {
             await tx.stockBalance.create({
               data: {
                 productId: item.productId,
-                warehouseId: purchase.warehouseId,
+                warehouseId: resolvedWarehouseId,
                 quantity: -item.baseQuantity,
               },
             });
@@ -107,14 +113,23 @@ export class PurchaseReturnsService {
           await tx.stockTransaction.create({
             data: {
               productId: item.productId,
-              warehouseId: purchase.warehouseId,
+              warehouseId: resolvedWarehouseId,
               transactionType: "PURCHASE_RETURN",
               referenceId: `PURCHASE-RETURN-${purchaseReturn.id}`,
               unitId: item.unitId,
-              unitQuantity: -item.quantity,
+              unitQuantity: -Number(item.quantity),
               baseQuantity: -item.baseQuantity,
             },
           });
+        }
+
+        for (const item of resolvedItems) {
+          try {
+            await tx.product.update({
+              where: { id: item.productId },
+              data: { version: { increment: 1 }, updatedAt: new Date() },
+            });
+          } catch (_) {}
         }
       }
 
@@ -150,7 +165,7 @@ export class PurchaseReturnsService {
       }
 
       return purchaseReturn;
-    });
+    }, { maxWait: 10000, timeout: 30000 });
   }
 
   async findAll() {
@@ -179,14 +194,96 @@ export class PurchaseReturnsService {
   }
 
   async remove(id: bigint) {
-    const item = await this.findOne(id);
+    const item = await this.prisma.purchaseReturn.findFirst({
+      where: { id, deletedAt: null },
+      include: {
+        purchase: { include: { supplier: true } },
+        items: { include: { product: true } },
+      },
+    });
+    if (!item) {
+      throw new NotFoundException("Purchase return not found");
+    }
+
     return this.prisma.$transaction(async (tx) => {
+      // 1. Soft-delete the return
       const result = await tx.purchaseReturn.update({
         where: { id },
         data: { deletedAt: new Date() },
       });
 
-      // Recalculate parent purchase due and payment status after return removal
+      // 2. Soft-delete the return items
+      if (tx.purchaseReturnItem?.updateMany) {
+        await tx.purchaseReturnItem.updateMany({
+          where: { purchaseReturnId: id },
+          data: { deletedAt: new Date() },
+        });
+      }
+
+      // 3. Restore warehouse stock
+      let targetWarehouseId = item.purchase?.warehouseId;
+      if (!targetWarehouseId) {
+        const defaultWh = await tx.warehouse.findFirst({ where: { deletedAt: null } }) || (await tx.warehouse.findFirst());
+        targetWarehouseId = defaultWh ? defaultWh.id : null;
+      }
+
+      if (targetWarehouseId && item.items && item.items.length > 0) {
+        for (const retItem of item.items) {
+          let convFactor = 1;
+          let targetUnitId = retItem.product?.baseUnitId ?? null;
+          if (retItem.productUnitId) {
+            const pu = await tx.productUnit.findUnique({ where: { id: retItem.productUnitId } });
+            if (pu?.conversionFactor) convFactor = Number(pu.conversionFactor);
+            if (pu?.unitId) targetUnitId = pu.unitId;
+          }
+          const baseQty = Number(retItem.quantity) * convFactor;
+
+          const existingStock = await tx.stockBalance.findUnique({
+            where: {
+              productId_warehouseId: {
+                productId: retItem.productId,
+                warehouseId: targetWarehouseId,
+              },
+            },
+          });
+
+          if (existingStock) {
+            await tx.stockBalance.update({
+              where: { id: existingStock.id },
+              data: { quantity: Number(existingStock.quantity) + baseQty },
+            });
+          } else {
+            await tx.stockBalance.create({
+              data: {
+                productId: retItem.productId,
+                warehouseId: targetWarehouseId,
+                quantity: baseQty,
+              },
+            });
+          }
+
+          await tx.stockTransaction.create({
+            data: {
+              productId: retItem.productId,
+              warehouseId: targetWarehouseId,
+              transactionType: "PURCHASE_RETURN_CANCELLED",
+              referenceId: `PURCHASE-RETURN-${item.id}`,
+              unitId: targetUnitId,
+              unitQuantity: Number(retItem.quantity),
+              baseQuantity: baseQty,
+            },
+          });
+
+          try {
+            await tx.product.update({
+              where: { id: retItem.productId },
+              data: { version: { increment: 1 }, updatedAt: new Date() },
+            });
+          } catch (_) {}
+        }
+      }
+
+      // 4. Recalculate parent purchase due and payment status after return removal
       const allReturns = await tx.purchaseReturn.findMany({
         where: { purchaseId: item.purchaseId, deletedAt: null },
         select: { totalAmount: true },
@@ -216,9 +313,11 @@ export class PurchaseReturnsService {
         });
       }
 
+      // 5. Recalculate supplier balance
       if (item.purchase?.supplierId) {
         await recalculateSupplierBalance(tx, item.purchase.supplierId);
       }
+
       return result;
     });
   }
