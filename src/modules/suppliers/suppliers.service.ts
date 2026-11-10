@@ -117,7 +117,10 @@ export async function recalculateSupplierBalance(
           showPreviousBalance: true,
           purchaseDate: true,
           createdAt: true,
-          returns: { select: { totalAmount: true } },
+          returns: {
+            where: { deletedAt: null },
+            select: { totalAmount: true },
+          },
         },
       },
     },

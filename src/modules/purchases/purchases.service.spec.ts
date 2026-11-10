@@ -16,6 +16,7 @@ describe("PurchasesService - Delete and Update Stock Adjustments", () => {
     },
     purchase: {
       update: jest.fn(),
+      create: jest.fn(),
     },
     purchaseItem: {
       deleteMany: jest.fn(),
@@ -41,6 +42,14 @@ describe("PurchasesService - Delete and Update Stock Adjustments", () => {
     },
     stockTransaction: {
       create: jest.fn(),
+    },
+    warehouse: {
+      findUnique: jest.fn(),
+      findFirst: jest.fn(),
+    },
+    supplier: {
+      findUnique: jest.fn(),
+      update: jest.fn(),
     },
   };
 
@@ -100,6 +109,12 @@ describe("PurchasesService - Delete and Update Stock Adjustments", () => {
           items: {
             include: {
               productUnit: true,
+            },
+          },
+          returns: {
+            where: { deletedAt: null },
+            include: {
+              items: true,
             },
           },
         },
@@ -219,6 +234,205 @@ describe("PurchasesService - Delete and Update Stock Adjustments", () => {
       // Verify purchase items replaced
       expect(mockTx.purchaseItem.deleteMany).toHaveBeenCalledWith({ where: { purchaseId } });
       expect(mockTx.purchaseItem.createMany).toHaveBeenCalled();
+    });
+  });
+
+  describe("remove with active returns", () => {
+    it("should deduct only net remaining quantity from stock if some items were already returned", async () => {
+      const purchaseId = 300n;
+      const existingPurchase = {
+        id: purchaseId,
+        warehouseId: 1,
+        deletedAt: null,
+        items: [
+          {
+            id: 1n,
+            productId: 10n,
+            quantity: 10,
+            productUnit: { conversionFactor: 1, unitId: 1 },
+          },
+        ],
+        returns: [
+          {
+            id: 1n,
+            purchaseId,
+            items: [
+              {
+                id: 11n,
+                productId: 10n,
+                quantity: 4,
+                productUnit: { conversionFactor: 1, unitId: 1 },
+              },
+            ],
+          },
+        ],
+      };
+
+      mockPrisma.purchase.findFirst.mockResolvedValue(existingPurchase);
+      mockTx.stockBalance.findUnique.mockResolvedValue({
+        id: 50n,
+        productId: 10n,
+        warehouseId: 1,
+        quantity: 26, // 30 originally - 4 returned = 26
+      });
+      mockTx.purchase.update.mockResolvedValue({ ...existingPurchase, deletedAt: new Date() });
+
+      await service.remove(purchaseId);
+
+      // Only net 6 (10 - 4 returned) should be deducted from stock: 26 - 6 = 20
+      expect(mockTx.stockBalance.update).toHaveBeenCalledWith({
+        where: { id: 50n },
+        data: { quantity: 20 },
+      });
+
+      expect(mockTx.stockTransaction.create).toHaveBeenCalledWith({
+        data: {
+          productId: 10n,
+          warehouseId: 1,
+          transactionType: "PURCHASE_CANCELLED",
+          referenceId: `PURCHASE-300`,
+          unitId: 1,
+          unitQuantity: -10,
+          baseQuantity: -6,
+        },
+      });
+    });
+  });
+
+  describe("create with supplier balance adjustment", () => {
+    it("should create payment with type receive when previous due is higher than existing balance", async () => {
+      mockTx.product.findUnique.mockResolvedValue({
+        id: 10n,
+        baseUnitId: 1,
+        productUnits: [{ id: 1n, unitId: 1, conversionFactor: 1 }],
+      });
+      mockTx.productUnit.findUnique.mockResolvedValue({ id: 1n, unitId: 1, conversionFactor: 1 });
+      mockTx.warehouse.findUnique.mockResolvedValue({ id: 1 });
+      mockTx.supplier = {
+        findUnique: jest.fn().mockResolvedValue({ id: 5, outstandingBalance: 100 }),
+        update: jest.fn(),
+      };
+      mockTx.purchase.create.mockResolvedValue({
+        id: 400n,
+        invoiceNumber: "PUR-400",
+        grandTotal: 1000,
+        supplierId: 5,
+      });
+      mockTx.stockBalance.findUnique.mockResolvedValue({ id: 50n, quantity: 10 });
+      mockTx.payment.create.mockResolvedValue({ id: 101n, amount: 50 });
+
+      // Mock supplier for ledger recalculation
+      mockTx.supplier.findUnique.mockResolvedValue({
+        id: 5,
+        outstandingBalance: 100,
+        payments: [],
+        purchases: [],
+      });
+
+      mockPrisma.purchase.findFirst.mockResolvedValue({
+        id: 400n,
+        invoiceNumber: "PUR-400",
+        grandTotal: 1000,
+        supplierId: 5,
+      });
+
+      const createDto: any = {
+        supplierId: 5,
+        warehouseId: 1,
+        purchaseDate: new Date().toISOString(),
+        grandTotal: 1000,
+        paid: 0,
+        showPreviousBalance: true,
+        previousDue: 150, // 150 - 100 = +50 delta
+        advancePayment: 0,
+        items: [
+          {
+            productId: "10",
+            quantity: 5,
+            unitPrice: 200,
+            total: 1000,
+          },
+        ],
+      };
+
+      await service.create(createDto);
+
+      // Verify payment was created with type 'receive' to increase running balance
+      expect(mockTx.payment.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          amount: 50,
+          paymentMethod: "adjustment",
+          type: "receive",
+          supplierId: 5,
+        }),
+      });
+    });
+
+    it("should create payment with type pay when previous due is lower than existing balance", async () => {
+      mockTx.product.findUnique.mockResolvedValue({
+        id: 10n,
+        baseUnitId: 1,
+        productUnits: [{ id: 1n, unitId: 1, conversionFactor: 1 }],
+      });
+      mockTx.productUnit.findUnique.mockResolvedValue({ id: 1n, unitId: 1, conversionFactor: 1 });
+      mockTx.warehouse.findUnique.mockResolvedValue({ id: 1 });
+      mockTx.supplier = {
+        findUnique: jest.fn().mockResolvedValue({ id: 5, outstandingBalance: 100 }),
+        update: jest.fn(),
+      };
+      mockTx.purchase.create.mockResolvedValue({
+        id: 401n,
+        invoiceNumber: "PUR-401",
+        grandTotal: 1000,
+        supplierId: 5,
+      });
+      mockTx.stockBalance.findUnique.mockResolvedValue({ id: 50n, quantity: 10 });
+      mockTx.payment.create.mockResolvedValue({ id: 102n, amount: 40 });
+
+      mockTx.supplier.findUnique.mockResolvedValue({
+        id: 5,
+        outstandingBalance: 100,
+        payments: [],
+        purchases: [],
+      });
+
+      mockPrisma.purchase.findFirst.mockResolvedValue({
+        id: 401n,
+        invoiceNumber: "PUR-401",
+        grandTotal: 1000,
+        supplierId: 5,
+      });
+
+      const createDto: any = {
+        supplierId: 5,
+        warehouseId: 1,
+        purchaseDate: new Date().toISOString(),
+        grandTotal: 1000,
+        paid: 0,
+        showPreviousBalance: true,
+        previousDue: 60, // 60 - 100 = -40 delta
+        advancePayment: 0,
+        items: [
+          {
+            productId: "10",
+            quantity: 5,
+            unitPrice: 200,
+            total: 1000,
+          },
+        ],
+      };
+
+      await service.create(createDto);
+
+      // Verify payment was created with type 'pay' to decrease running balance
+      expect(mockTx.payment.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          amount: 40,
+          paymentMethod: "adjustment",
+          type: "pay",
+          supplierId: 5,
+        }),
+      });
     });
   });
 });

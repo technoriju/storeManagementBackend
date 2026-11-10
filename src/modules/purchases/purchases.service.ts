@@ -324,7 +324,7 @@ export class PurchasesService {
               amount: Math.abs(adjDelta),
               paymentMethod: "adjustment",
               referenceNumber: purchase.invoiceNumber,
-              type: adjDelta > 0 ? "pay" : "receive",
+              type: adjDelta > 0 ? "receive" : "pay",
               notes: `Mutual balance adjustment (${adjDelta > 0 ? "+" : "-"}₹${Math.abs(adjDelta).toFixed(2)}) on ${purchase.invoiceNumber}`,
               supplierId: resolvedSupplierId,
             },
@@ -462,6 +462,12 @@ export class PurchasesService {
         items: {
           include: {
             productUnit: true,
+          },
+        },
+        payments: {
+          where: { deletedAt: null },
+          include: {
+            payment: true,
           },
         },
       },
@@ -622,6 +628,18 @@ export class PurchasesService {
                 },
               });
             }
+
+            await tx.stockTransaction.create({
+              data: {
+                productId: oldItem.productId,
+                warehouseId: oldWarehouseId,
+                transactionType: "PURCHASE_UPDATE_REVERSAL",
+                referenceId: `PURCHASE-${existing.id}`,
+                unitId: oldItem.productUnit?.unitId ?? null,
+                unitQuantity: -Number(oldItem.quantity),
+                baseQuantity: -oldBaseQty,
+              },
+            });
           }
         }
 
@@ -693,26 +711,193 @@ export class PurchasesService {
             unitPrice: Number(item.unitPrice),
             discount: Number(item.discount || 0),
             taxAmount: Number(item.taxAmount || 0),
-            total: Number(item.total),
+            total: Number(item.total !== undefined ? item.total : (Number(item.quantity) * Number(item.unitPrice) - Number(item.discount || 0) + Number(item.taxAmount || 0))),
           })),
         });
+      } else if (purchaseData.status && purchaseData.status !== existing.status) {
+        // Status changed without items array
+        const oldStatus = String(existing.status || 'COMPLETED').toUpperCase();
+        const isOldStocked = oldStatus === 'COMPLETED' || oldStatus === 'RECEIVED';
+        const newStatus = String(purchaseData.status).toUpperCase();
+        const isNewStocked = newStatus === 'COMPLETED' || newStatus === 'RECEIVED';
+
+        if (isOldStocked && !isNewStocked && oldWarehouseId && existing.items) {
+          for (const oldItem of existing.items) {
+            const conv = oldItem.productUnit?.conversionFactor ? Number(oldItem.productUnit.conversionFactor) : 1;
+            const oldBaseQty = Number(oldItem.quantity) * conv;
+            const existingStock = await tx.stockBalance.findUnique({
+              where: { productId_warehouseId: { productId: oldItem.productId, warehouseId: oldWarehouseId } },
+            });
+            if (existingStock) {
+              await tx.stockBalance.update({
+                where: { id: existingStock.id },
+                data: { quantity: Number(existingStock.quantity) - oldBaseQty },
+              });
+            }
+            await tx.stockTransaction.create({
+              data: {
+                productId: oldItem.productId,
+                warehouseId: oldWarehouseId,
+                transactionType: "PURCHASE_CANCELLED",
+                referenceId: `PURCHASE-${existing.id}`,
+                unitId: oldItem.productUnit?.unitId ?? null,
+                unitQuantity: -Number(oldItem.quantity),
+                baseQuantity: -oldBaseQty,
+              },
+            });
+            try {
+              await tx.product.update({
+                where: { id: oldItem.productId },
+                data: { version: { increment: 1 }, updatedAt: new Date() },
+              });
+            } catch (_) {}
+          }
+        } else if (!isOldStocked && isNewStocked && resolvedWarehouseId && existing.items) {
+          for (const oldItem of existing.items) {
+            const conv = oldItem.productUnit?.conversionFactor ? Number(oldItem.productUnit.conversionFactor) : 1;
+            const oldBaseQty = Number(oldItem.quantity) * conv;
+            const existingStock = await tx.stockBalance.findUnique({
+              where: { productId_warehouseId: { productId: oldItem.productId, warehouseId: resolvedWarehouseId } },
+            });
+            if (existingStock) {
+              await tx.stockBalance.update({
+                where: { id: existingStock.id },
+                data: { quantity: Number(existingStock.quantity) + oldBaseQty },
+              });
+            } else {
+              await tx.stockBalance.create({
+                data: { productId: oldItem.productId, warehouseId: resolvedWarehouseId, quantity: oldBaseQty },
+              });
+            }
+            await tx.stockTransaction.create({
+              data: {
+                productId: oldItem.productId,
+                warehouseId: resolvedWarehouseId,
+                transactionType: "PURCHASE",
+                referenceId: `PURCHASE-${existing.id}`,
+                unitId: oldItem.productUnit?.unitId ?? null,
+                unitQuantity: Number(oldItem.quantity),
+                baseQuantity: oldBaseQty,
+              },
+            });
+            try {
+              await tx.product.update({
+                where: { id: oldItem.productId },
+                data: { version: { increment: 1 }, updatedAt: new Date() },
+              });
+            } catch (_) {}
+          }
+        }
       }
 
       // 4. Update purchase scalar fields
       const updateData: any = {};
       if (purchaseData.subTotal !== undefined) updateData.subTotal = Number(purchaseData.subTotal);
+      else if ((purchaseData as any).subtotal !== undefined) updateData.subTotal = Number((purchaseData as any).subtotal);
+
       if (purchaseData.taxTotal !== undefined) updateData.taxTotal = Number(purchaseData.taxTotal);
+      else if ((purchaseData as any).orderTax !== undefined || (purchaseData as any).gst !== undefined) {
+        updateData.taxTotal = Number((purchaseData as any).orderTax || 0) + Number((purchaseData as any).gst || 0);
+      }
+
       if (purchaseData.discountTotal !== undefined) updateData.discountTotal = Number(purchaseData.discountTotal);
+      else if ((purchaseData as any).discount !== undefined) updateData.discountTotal = Number((purchaseData as any).discount);
+
       if (purchaseData.grandTotal !== undefined) updateData.grandTotal = Number(purchaseData.grandTotal);
+      else if ((purchaseData as any).total !== undefined) updateData.grandTotal = Number((purchaseData as any).total);
       if (purchaseData.paid !== undefined) updateData.paid = Number(purchaseData.paid);
       if (purchaseData.due !== undefined) updateData.due = Number(purchaseData.due);
       if (purchaseData.status !== undefined) updateData.status = purchaseData.status;
       if (purchaseData.paymentStatus !== undefined) updateData.paymentStatus = purchaseData.paymentStatus;
       if (purchaseData.notes !== undefined) updateData.notes = purchaseData.notes;
+      if (purchaseData.previousDue !== undefined) updateData.previousDue = Number(purchaseData.previousDue);
+      if (purchaseData.advancePayment !== undefined) updateData.advancePayment = Number(purchaseData.advancePayment);
+      if (purchaseData.showPreviousBalance !== undefined) updateData.showPreviousBalance = Boolean(purchaseData.showPreviousBalance);
       if (purchaseData.warehouseId !== undefined) updateData.warehouseId = resolvedWarehouseId;
       if (purchaseData.branchId !== undefined) updateData.branchId = purchaseData.branchId ? Number(purchaseData.branchId) : null;
       if (purchaseData.supplierId !== undefined) updateData.supplierId = purchaseData.supplierId ? Number(purchaseData.supplierId) : null;
       if (purchaseData.purchaseDate !== undefined) updateData.purchaseDate = new Date(purchaseData.purchaseDate);
+
+      // Handle payment sync or fresh payment in purchase update
+      if (purchaseData.paid !== undefined) {
+        const targetPaid = Number(purchaseData.paid);
+        const linkedPayments = (existing as any).payments?.filter((pp: any) => pp.payment && pp.payment.deletedAt === null) || [];
+        if (linkedPayments.length > 0) {
+          const firstPayment = linkedPayments[0].payment;
+          if (targetPaid > 0) {
+            await tx.payment.update({
+              where: { id: firstPayment.id },
+              data: {
+                amount: targetPaid,
+                supplierId: updateData.supplierId || existing.supplierId,
+                updatedAt: new Date(),
+              },
+            });
+          } else {
+            await tx.payment.update({
+              where: { id: firstPayment.id },
+              data: { deletedAt: new Date() },
+            });
+          }
+        } else if (targetPaid > 0) {
+          const payment = await tx.payment.create({
+            data: {
+              paymentDate: updateData.purchaseDate || new Date(),
+              amount: targetPaid,
+              paymentMethod: paymentMethod || "CASH",
+              referenceNumber: existing.invoiceNumber,
+              type: "pay",
+              supplierId: updateData.supplierId || existing.supplierId,
+            },
+          });
+          await tx.purchasePayment.create({
+            data: {
+              purchaseId: targetPurchaseId,
+              paymentId: payment.id,
+            },
+          });
+        }
+      } else if (paymentAmount !== undefined && Number(paymentAmount) > 0) {
+        const payAmt = Number(paymentAmount);
+        const payment = await tx.payment.create({
+          data: {
+            paymentDate: new Date(),
+            amount: payAmt,
+            paymentMethod: paymentMethod || "CASH",
+            referenceNumber: existing.invoiceNumber,
+            type: "pay",
+            supplierId: updateData.supplierId || existing.supplierId,
+          },
+        });
+        await tx.purchasePayment.create({
+          data: {
+            purchaseId: targetPurchaseId,
+            paymentId: payment.id,
+          },
+        });
+        const currentPaid = Number(updateData.paid ?? existing.paid ?? 0);
+        updateData.paid = Number((currentPaid + payAmt).toFixed(2));
+      }
+
+      const finalGrandTotal = updateData.grandTotal !== undefined ? Number(updateData.grandTotal) : Number(existing.grandTotal || 0);
+      const finalPaid = updateData.paid !== undefined ? Number(updateData.paid) : Number(existing.paid || 0);
+      if (updateData.due === undefined && (updateData.grandTotal !== undefined || updateData.paid !== undefined)) {
+        let returnedAmt = 0;
+        if (tx.purchaseReturn?.findMany) {
+          const totalReturns = await tx.purchaseReturn.findMany({
+            where: { purchaseId: targetPurchaseId, deletedAt: null },
+            select: { totalAmount: true },
+          });
+          returnedAmt = totalReturns.reduce((sum, r) => sum + Number(r.totalAmount || 0), 0);
+        }
+        updateData.due = Math.max(0, Number((finalGrandTotal - returnedAmt - finalPaid).toFixed(2)));
+      }
+      if (updateData.paymentStatus === undefined && (updateData.due !== undefined || updateData.grandTotal !== undefined || updateData.paid !== undefined)) {
+        const effectiveDue = updateData.due !== undefined ? Number(updateData.due) : Math.max(0, finalGrandTotal - finalPaid);
+        if (effectiveDue === 0 && (finalPaid > 0 || finalGrandTotal === 0)) updateData.paymentStatus = "Paid";
+        else if (finalPaid > 0) updateData.paymentStatus = "Partial";
+        else updateData.paymentStatus = "Unpaid";
+      }
 
       const updated = await tx.purchase.update({
         where: { id: targetPurchaseId },
@@ -764,6 +949,12 @@ export class PurchasesService {
             productUnit: true,
           },
         },
+        returns: {
+          where: { deletedAt: null },
+          include: {
+            items: true,
+          },
+        },
       },
     });
     if (!existing) {
@@ -778,49 +969,94 @@ export class PurchasesService {
         targetWarehouseId = defaultWh ? defaultWh.id : null;
       }
 
+      // Calculate any items already returned so we do not double-deduct returned stock
+      const returnedBaseQtyByProduct = new Map<string, number>();
+      const existingReturns = (existing as any).returns || [];
+      for (const ret of existingReturns) {
+        for (const retItem of ret.items || []) {
+          let retConv = 1;
+          if (retItem.productUnitId) {
+            const pu = await tx.productUnit.findUnique({ where: { id: retItem.productUnitId } });
+            if (pu?.conversionFactor) retConv = Number(pu.conversionFactor);
+          }
+          const retBaseQty = Number(retItem.quantity) * retConv;
+          const key = retItem.productId.toString();
+          returnedBaseQtyByProduct.set(key, (returnedBaseQtyByProduct.get(key) || 0) + retBaseQty);
+        }
+      }
+
       const existingItems: any[] = (existing as any).items || [];
       if (targetWarehouseId && existingItems.length > 0) {
         for (const item of existingItems) {
           const convFactor = item.productUnit?.conversionFactor ? Number(item.productUnit.conversionFactor) : 1;
-          const baseQty = Number(item.quantity) * convFactor;
+          const fullBaseQty = Number(item.quantity) * convFactor;
+          const key = item.productId.toString();
+          const alreadyReturned = returnedBaseQtyByProduct.get(key) || 0;
+          const netBaseQtyToDeduct = Math.max(0, fullBaseQty - alreadyReturned);
+          if (alreadyReturned > 0) {
+            returnedBaseQtyByProduct.set(key, Math.max(0, alreadyReturned - fullBaseQty));
+          }
 
-          const existingStock = await tx.stockBalance.findUnique({
-            where: {
-              productId_warehouseId: {
-                productId: item.productId,
-                warehouseId: targetWarehouseId,
+          if (netBaseQtyToDeduct > 0) {
+            const existingStock = await tx.stockBalance.findUnique({
+              where: {
+                productId_warehouseId: {
+                  productId: item.productId,
+                  warehouseId: targetWarehouseId,
+                },
               },
-            },
-          });
-
-          if (existingStock) {
-            await tx.stockBalance.update({
-              where: { id: existingStock.id },
-              data: { quantity: Number(existingStock.quantity) - baseQty },
             });
-          } else {
-            await tx.stockBalance.create({
+
+            if (existingStock) {
+              await tx.stockBalance.update({
+                where: { id: existingStock.id },
+                data: { quantity: Number(existingStock.quantity) - netBaseQtyToDeduct },
+              });
+            } else {
+              await tx.stockBalance.create({
+                data: {
+                  productId: item.productId,
+                  warehouseId: targetWarehouseId,
+                  quantity: -netBaseQtyToDeduct,
+                },
+              });
+            }
+
+            // Create reversing StockTransaction
+            await tx.stockTransaction.create({
               data: {
                 productId: item.productId,
                 warehouseId: targetWarehouseId,
-                quantity: -baseQty,
+                transactionType: "PURCHASE_CANCELLED",
+                referenceId: `PURCHASE-${existing.id}`,
+                unitId: item.productUnit?.unitId ?? null,
+                unitQuantity: -Number(item.quantity),
+                baseQuantity: -netBaseQtyToDeduct,
               },
             });
           }
 
-          // Create reversing StockTransaction
-          await tx.stockTransaction.create({
-            data: {
-              productId: item.productId,
-              warehouseId: targetWarehouseId,
-              transactionType: "PURCHASE_CANCELLED",
-              referenceId: `PURCHASE-${existing.id}`,
-              unitId: item.productUnit?.unitId ?? null,
-              unitQuantity: -Number(item.quantity),
-              baseQuantity: -baseQty,
-            },
-          });
+          try {
+            await tx.product.update({
+              where: { id: item.productId },
+              data: { version: { increment: 1 }, updatedAt: new Date() },
+            });
+          } catch (_) {}
         }
+      }
+
+      // Soft delete active purchase returns linked to this purchase
+      if (tx.purchaseReturn?.updateMany) {
+        await tx.purchaseReturn.updateMany({
+          where: { purchaseId: existing.id, deletedAt: null },
+          data: { deletedAt: new Date() },
+        });
+      }
+      if (tx.purchaseReturnItem?.updateMany) {
+        await tx.purchaseReturnItem.updateMany({
+          where: { purchaseReturn: { purchaseId: existing.id } },
+          data: { deletedAt: new Date() },
+        });
       }
 
       // 2. Mark items soft-deleted
