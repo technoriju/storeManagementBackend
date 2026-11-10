@@ -32,6 +32,14 @@ export class SaleItemDto {
   unitType?: string;
 
   @IsOptional()
+  @IsString()
+  unit?: string;
+
+  @IsOptional()
+  @IsString()
+  unitName?: string;
+
+  @IsOptional()
   @IsNumber()
   conversionRate?: number;
 }

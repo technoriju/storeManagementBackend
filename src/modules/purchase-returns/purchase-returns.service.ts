@@ -165,7 +165,7 @@ export class PurchaseReturnsService {
       }
 
       return purchaseReturn;
-    });
+    }, { maxWait: 10000, timeout: 30000 });
   }
 
   async findAll() {

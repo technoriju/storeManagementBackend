@@ -102,6 +102,9 @@ export class SalesService {
           productUnitId: puId,
           unitId: pu?.unitId ?? (product.baseUnitId || 1),
           baseQuantity,
+          unit: (item as any).unit || (item as any).unitName || null,
+          unitType: (item as any).unitType || 'base',
+          conversionRate: (item as any).conversionRate ? Number((item as any).conversionRate) : null,
         });
       }
 
@@ -171,6 +174,9 @@ export class SalesService {
               discount: item.discount || 0,
               taxAmount: item.taxAmount || 0,
               total: item.total,
+              unit: item.unit || item.unitName || null,
+              unitType: item.unitType || 'base',
+              conversionRate: item.conversionRate ? Number(item.conversionRate) : null,
             })),
           },
         },
@@ -401,15 +407,28 @@ export class SalesService {
       const subCategoryName = prod.subCategory?.name ?? null;
 
       const cRate = Number(item.conversionRate ?? prod.conversionRate ?? item.productUnit?.conversionFactor ?? 1);
-      const isSubUnit =
-        (item.unitType === 'sub') ||
-        (item.productUnit?.unit?.name && subUnitName && item.productUnit.unit.name.toLowerCase() === subUnitName.toLowerCase()) ||
-        (item.unit && subUnitName && item.unit.toLowerCase() === subUnitName.toLowerCase()) ||
-        (cRate > 1 && subUnitName && prod.retailPrice && Math.abs(Number(item.unitPrice) - (Number(prod.retailPrice) / cRate)) < 0.1) ||
-        (cRate > 1 && subUnitName && prod.wholesalePrice && Math.abs(Number(item.unitPrice) - (Number(prod.wholesalePrice) / cRate)) < 0.1);
+      const baseRef = Number(prod.wholesalePrice || prod.retailPrice || 0);
+      const subRef = cRate > 0 ? baseRef / cRate : baseRef;
+      const uPrice = Number(item.unitPrice || 0);
+      const isPriceCloserToSub = Boolean(cRate > 1 && subUnitName && baseRef > 0 && Math.abs(uPrice - subRef) < Math.abs(uPrice - baseRef));
 
-      const effectiveUnit = isSubUnit ? (subUnitName || 'Pcs') : (item.productUnit?.unit?.name || unitName || 'Unit');
-      const effectiveUnitType = isSubUnit ? 'sub' : 'base';
+      let effectiveUnit = item.unit || item.unitName || null;
+      let effectiveUnitType: 'base' | 'sub' | null = null;
+
+      if (effectiveUnit) {
+        if (subUnitName && effectiveUnit.trim().toLowerCase() === subUnitName.trim().toLowerCase()) {
+          effectiveUnitType = 'sub';
+        } else if (unitName && effectiveUnit.trim().toLowerCase() === unitName.trim().toLowerCase()) {
+          effectiveUnitType = isPriceCloserToSub ? 'sub' : 'base';
+          if (isPriceCloserToSub && subUnitName) effectiveUnit = subUnitName;
+        } else {
+          effectiveUnitType = isPriceCloserToSub ? 'sub' : ((item.unitType === 'base' || item.unitType === 'sub') ? item.unitType : 'base');
+          if (effectiveUnitType === 'sub' && subUnitName && !effectiveUnit) effectiveUnit = subUnitName;
+        }
+      } else {
+        effectiveUnitType = isPriceCloserToSub ? 'sub' : ((item.unitType === 'base' || item.unitType === 'sub') ? item.unitType : 'base');
+        effectiveUnit = effectiveUnitType === 'sub' ? (subUnitName || 'Pcs') : (unitName || 'Unit');
+      }
 
       return {
         ...item,
@@ -663,6 +682,9 @@ export class SalesService {
             productUnitId: puId,
             unitId: pu?.unitId ?? (product.baseUnitId || 1),
             baseQuantity,
+            unit: (item as any).unit || (item as any).unitName || null,
+            unitType: (item as any).unitType || 'base',
+            conversionRate: (item as any).conversionRate ? Number((item as any).conversionRate) : null,
           });
         }
 
@@ -780,6 +802,9 @@ export class SalesService {
             discount: Number(item.discount || 0),
             taxAmount: Number(item.taxAmount || 0),
             total: Number(item.total),
+            unit: item.unit || item.unitName || null,
+            unitType: item.unitType || 'base',
+            conversionRate: item.conversionRate ? Number(item.conversionRate) : null,
           })),
         });
       }
