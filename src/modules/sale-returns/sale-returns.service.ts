@@ -21,6 +21,12 @@ export class SaleReturnsService {
     const returnNumber = returnData.returnNumber || `SRT-${Date.now().toString().slice(-6)}`;
 
     return this.prisma.$transaction(async (tx) => {
+      // 0. Fetch original sale items for accurate unit and conversion matching
+      const originalSaleItems = await tx.saleItem.findMany({
+        where: { saleId: saleIdBigInt },
+        include: { productUnit: true },
+      });
+
       // 1. Resolve product units and quantities
       const resolvedItems: any[] = [];
       for (const item of items) {
@@ -31,25 +37,60 @@ export class SaleReturnsService {
         });
         if (!product) throw new NotFoundException(`Product ${item.productId} not found`);
 
+        const matchingSaleItem = originalSaleItems.find((si) => si.productId === prodId);
+
         let puId = item.productUnitId ? BigInt(item.productUnitId) : null;
         let pu = puId ? await tx.productUnit.findUnique({ where: { id: puId } }) : null;
 
-        if (!pu) {
-          if (product.defaultSalesUnitId) {
-            pu = await tx.productUnit.findUnique({ where: { id: product.defaultSalesUnitId } });
-          } else if (product.productUnits && product.productUnits.length > 0) {
-            pu = product.productUnits[0];
-          }
+        // If not explicitly provided, match unit from the original sale item
+        if (!pu && matchingSaleItem?.productUnitId) {
+          pu = await tx.productUnit.findUnique({ where: { id: matchingSaleItem.productUnitId } });
+          puId = pu ? pu.id : null;
         }
 
-        const conversionFactor = pu ? Number(pu.conversionFactor || 1) : 1;
-        const baseQuantity = item.quantity * conversionFactor;
+        const isExplicitBase = (item as any).unitType === 'base';
+        const isExplicitSub = (item as any).unitType === 'sub';
+
+        // If base unit is requested, prefer unit with conversionFactor = 1 or baseUnitId
+        if (!pu && isExplicitBase) {
+          pu = product.productUnits?.find((u) => Number(u.conversionFactor) === 1) ||
+               product.productUnits?.find((u) => u.unitId === (product.baseUnitId || 1)) || null;
+          puId = pu ? pu.id : null;
+        }
+
+        // If sub unit is requested with conversion rate
+        if (!pu && isExplicitSub && (item as any).conversionRate) {
+          const subFactor = 1 / Number((item as any).conversionRate);
+          pu = product.productUnits?.find((u) => Math.abs(Number(u.conversionFactor) - subFactor) < 0.0001) || null;
+          puId = pu ? pu.id : null;
+        }
+
+        // Fallback: look for unit with factor 1 or base unit
+        if (!pu) {
+          pu = product.productUnits?.find((u) => Number(u.conversionFactor) === 1) ||
+               product.productUnits?.find((u) => u.unitId === (product.baseUnitId || 1)) ||
+               (product.productUnits && product.productUnits.length > 0 ? product.productUnits[0] : null);
+          puId = pu ? pu.id : null;
+        }
+
+        // Calculate baseQuantity correctly:
+        let baseQuantity: number;
+        if (isExplicitBase) {
+          baseQuantity = Number(item.quantity);
+        } else if (isExplicitSub) {
+          const convRate = Number((item as any).conversionRate || product.conversionRate || 1);
+          baseQuantity = convRate > 0 ? Number(item.quantity) / convRate : Number(item.quantity);
+        } else if (pu?.conversionFactor) {
+          baseQuantity = Number(item.quantity) * Number(pu.conversionFactor);
+        } else {
+          baseQuantity = Number(item.quantity);
+        }
 
         resolvedItems.push({
           ...item,
           productId: prodId,
           productUnitId: pu ? pu.id : null,
-          unitId: product.baseUnitId,
+          unitId: pu?.unitId ?? (product.baseUnitId || 1),
           baseQuantity,
         });
       }
@@ -78,44 +119,51 @@ export class SaleReturnsService {
       });
 
       // 3. Restock items into warehouse inventory (if warehouse present)
-      if (sale.warehouseId) {
-        for (const item of resolvedItems) {
-          const existingStock = await tx.stockBalance.findUnique({
-            where: {
-              productId_warehouseId: {
-                productId: item.productId,
-                warehouseId: sale.warehouseId,
-              },
+      const targetWarehouseId = sale.warehouseId || 1;
+      for (const item of resolvedItems) {
+        const existingStock = await tx.stockBalance.findUnique({
+          where: {
+            productId_warehouseId: {
+              productId: item.productId,
+              warehouseId: targetWarehouseId,
             },
+          },
+        });
+
+        if (existingStock) {
+          const newQty = Number((Number(existingStock.quantity) + item.baseQuantity).toFixed(4));
+          await tx.stockBalance.update({
+            where: { id: existingStock.id },
+            data: { quantity: newQty },
           });
-
-          if (existingStock) {
-            await tx.stockBalance.update({
-              where: { id: existingStock.id },
-              data: { quantity: Number(existingStock.quantity) + item.baseQuantity },
-            });
-          } else {
-            await tx.stockBalance.create({
-              data: {
-                productId: item.productId,
-                warehouseId: sale.warehouseId,
-                quantity: item.baseQuantity,
-              },
-            });
-          }
-
-          await tx.stockTransaction.create({
+        } else {
+          await tx.stockBalance.create({
             data: {
               productId: item.productId,
-              warehouseId: sale.warehouseId,
-              transactionType: "SALE_RETURN",
-              referenceId: `SALE-RETURN-${saleReturn.id}`,
-              unitId: item.unitId,
-              unitQuantity: item.quantity,
-              baseQuantity: item.baseQuantity,
+              warehouseId: targetWarehouseId,
+              quantity: item.baseQuantity,
             },
           });
         }
+
+        await tx.stockTransaction.create({
+          data: {
+            productId: item.productId,
+            warehouseId: targetWarehouseId,
+            transactionType: "SALE_RETURN",
+            referenceId: `SALE-RETURN-${saleReturn.id}`,
+            unitId: item.unitId,
+            unitQuantity: item.quantity,
+            baseQuantity: item.baseQuantity,
+          },
+        });
+
+        try {
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { version: { increment: 1 }, updatedAt: new Date() },
+          });
+        } catch (_) {}
       }
 
       // 4. Update parent sale due and payment status

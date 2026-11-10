@@ -24,6 +24,18 @@ export class SaleReturnItemDto {
   @IsNumber()
   taxAmount?: number;
 
+  @IsOptional()
+  @IsString()
+  unit?: string;
+
+  @IsOptional()
+  @IsString()
+  unitType?: string;
+
+  @IsOptional()
+  @IsNumber()
+  conversionRate?: number;
+
   @IsNumber()
   total: number;
 }
