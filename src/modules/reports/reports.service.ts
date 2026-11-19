@@ -658,7 +658,7 @@ export class ReportsService {
 
     const where: any = {
       deletedAt: null,
-      ...(filters.customerId && { id: filters.customerId }),
+      ...(filters.customerId && { id: Number(filters.customerId) }),
       ...(filters.search && {
         OR: [
           { name: { contains: filters.search } },
@@ -732,14 +732,18 @@ export class ReportsService {
         }
       });
 
-      const outstanding = Number(
-        Math.max(0, totalBilled - totalPaid - totalReturned).toFixed(2),
-      );
+      const outstanding =
+        customer.outstandingBalance !== undefined &&
+        customer.outstandingBalance !== null
+          ? Number(this.toNumber(customer.outstandingBalance).toFixed(2))
+          : Number(
+              Math.max(0, totalBilled - totalPaid - totalReturned).toFixed(2),
+            );
       if (outstanding > 0) customersWithDue++;
 
       overallBilled += totalBilled;
       overallPaid += totalPaid;
-      overallOutstanding += outstanding;
+      overallOutstanding += Math.max(0, outstanding);
 
       return {
         id: customer.id,
@@ -794,7 +798,7 @@ export class ReportsService {
 
     const where: any = {
       deletedAt: null,
-      ...(filters.supplierId && { id: filters.supplierId }),
+      ...(filters.supplierId && { id: Number(filters.supplierId) }),
       ...(filters.search && {
         OR: [
           { name: { contains: filters.search } },
@@ -868,14 +872,18 @@ export class ReportsService {
         }
       });
 
-      const outstanding = Number(
-        Math.max(0, totalPurchased - totalPaid - totalReturned).toFixed(2),
-      );
+      const outstanding =
+        supplier.outstandingBalance !== undefined &&
+        supplier.outstandingBalance !== null
+          ? Number(this.toNumber(supplier.outstandingBalance).toFixed(2))
+          : Number(
+              Math.max(0, totalPurchased - totalPaid - totalReturned).toFixed(2),
+            );
       if (outstanding > 0) suppliersWithDue++;
 
       overallPurchased += totalPurchased;
       overallPaid += totalPaid;
-      overallOutstanding += outstanding;
+      overallOutstanding += Math.max(0, outstanding);
 
       return {
         id: supplier.id,

@@ -49,6 +49,10 @@ export class CreatePurchaseDto {
   @IsInt()
   supplierId?: number;
 
+  @IsOptional()
+  @IsString()
+  supplierName?: string;
+
   @IsString()
   invoiceNumber: string;
 
