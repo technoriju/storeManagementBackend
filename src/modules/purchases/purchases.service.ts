@@ -10,7 +10,7 @@ export class PurchasesService {
   constructor(private prisma: PrismaService) {}
 
   async create(createPurchaseDto: CreatePurchaseDto) {
-    const { items, paymentAmount, paymentMethod, advancePayment, showPreviousBalance, previousDue, balanceAdjustment, ...purchaseData } = createPurchaseDto;
+    const { items, paymentAmount, paymentMethod, advancePayment, showPreviousBalance, previousDue, balanceAdjustment, supplierName, ...purchaseData } = createPurchaseDto;
 
     const created = await this.prisma.$transaction(async (tx) => {
       // 1. Resolve product units and quantities
@@ -123,9 +123,20 @@ export class PurchasesService {
       }
 
       let resolvedSupplierId: number | null = null;
-      if (purchaseData.supplierId) {
-        const supp = await tx.supplier.findUnique({ where: { id: purchaseData.supplierId } });
+      if (purchaseData.supplierId && Number(purchaseData.supplierId) > 0) {
+        const supp = await tx.supplier.findUnique({ where: { id: Number(purchaseData.supplierId) } });
         resolvedSupplierId = supp ? supp.id : null;
+      }
+      if (!resolvedSupplierId && supplierName) {
+        const suppName = String(supplierName).trim();
+        if (suppName) {
+          const suppByName = await tx.supplier.findFirst({
+            where: { name: suppName, deletedAt: null },
+          });
+          if (suppByName) {
+            resolvedSupplierId = suppByName.id;
+          }
+        }
       }
 
       const grandTotalNum = Number(purchaseData.grandTotal || 0);
@@ -477,7 +488,7 @@ export class PurchasesService {
     }
     const targetPurchaseId = existing.id;
 
-    const { items, paymentAmount, paymentMethod, ...purchaseData } = updatePurchaseDto;
+    const { items, paymentAmount, paymentMethod, supplierName, ...purchaseData } = updatePurchaseDto;
 
     const created = await this.prisma.$transaction(async (tx) => {
       let resolvedWarehouseId: number | null = null;
@@ -815,7 +826,25 @@ export class PurchasesService {
       if (purchaseData.showPreviousBalance !== undefined) updateData.showPreviousBalance = Boolean(purchaseData.showPreviousBalance);
       if (purchaseData.warehouseId !== undefined) updateData.warehouseId = resolvedWarehouseId;
       if (purchaseData.branchId !== undefined) updateData.branchId = purchaseData.branchId ? Number(purchaseData.branchId) : null;
-      if (purchaseData.supplierId !== undefined) updateData.supplierId = purchaseData.supplierId ? Number(purchaseData.supplierId) : null;
+      if (purchaseData.supplierId !== undefined) {
+        if (purchaseData.supplierId && Number(purchaseData.supplierId) > 0) {
+          const supp = await tx.supplier.findUnique({ where: { id: Number(purchaseData.supplierId) } });
+          updateData.supplierId = supp ? supp.id : null;
+        } else {
+          updateData.supplierId = null;
+        }
+      }
+      if ((updateData.supplierId === undefined || updateData.supplierId === null) && supplierName) {
+        const suppName = String(supplierName).trim();
+        if (suppName) {
+          const suppByName = await tx.supplier.findFirst({
+            where: { name: suppName, deletedAt: null },
+          });
+          if (suppByName) {
+            updateData.supplierId = suppByName.id;
+          }
+        }
+      }
       if (purchaseData.purchaseDate !== undefined) updateData.purchaseDate = new Date(purchaseData.purchaseDate);
 
       // Handle payment sync or fresh payment in purchase update
