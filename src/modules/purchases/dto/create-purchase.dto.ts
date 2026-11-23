@@ -34,6 +34,14 @@ export class PurchaseItemDto {
   @IsOptional()
   @IsNumber()
   conversionRate?: number;
+
+  @IsOptional()
+  @IsString()
+  unit?: string;
+
+  @IsOptional()
+  @IsString()
+  unitName?: string;
 }
 
 export class CreatePurchaseDto {
