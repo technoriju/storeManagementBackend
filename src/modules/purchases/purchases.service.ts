@@ -354,8 +354,97 @@ export class PurchasesService {
     try {
       return await this.findOne(created.id);
     } catch (_) {
-      return created;
+      return this.formatPurchase(created);
     }
+  }
+
+  private readonly purchaseInclude = {
+    supplier: true,
+    warehouse: true,
+    branch: true,
+    items: {
+      include: {
+        product: {
+          include: {
+            baseUnit: true,
+            subUnit: true,
+            brand: true,
+            category: true,
+            subCategory: true,
+          },
+        },
+        productUnit: {
+          include: {
+            unit: true,
+          },
+        },
+      },
+    },
+    payments: { include: { payment: true } },
+  };
+
+  private formatPurchase(purchase: any) {
+    if (!purchase) return purchase;
+    if (!purchase.items || !Array.isArray(purchase.items)) return purchase;
+
+    const formattedItems = purchase.items.map((item: any) => {
+      if (!item.product) return item;
+      const prod = item.product;
+      const unitName = prod.baseUnit?.name ?? null;
+      const brandName = prod.brand?.name ?? null;
+      const subUnitName = prod.subUnit?.name ?? null;
+      const categoryName = prod.category?.name ?? null;
+      const subCategoryName = prod.subCategory?.name ?? null;
+
+      const cRate = Number(item.conversionRate ?? prod.conversionRate ?? item.productUnit?.conversionFactor ?? 1);
+      const baseRef = Number(prod.purchasePrice || prod.cost || prod.wholesalePrice || prod.retailPrice || 0);
+      const subRef = cRate > 0 ? baseRef / cRate : baseRef;
+      const uPrice = Number(item.unitPrice || item.unitCost || 0);
+      const isPriceCloserToSub = Boolean(cRate > 1 && subUnitName && baseRef > 0 && Math.abs(uPrice - subRef) < Math.abs(uPrice - baseRef));
+
+      let effectiveUnit = item.unit || item.unitName || item.productUnit?.unit?.name || null;
+      let effectiveUnitType: 'base' | 'sub' | null = null;
+
+      if (effectiveUnit) {
+        if (subUnitName && effectiveUnit.trim().toLowerCase() === subUnitName.trim().toLowerCase()) {
+          effectiveUnitType = 'sub';
+        } else if (unitName && effectiveUnit.trim().toLowerCase() === unitName.trim().toLowerCase()) {
+          effectiveUnitType = isPriceCloserToSub ? 'sub' : 'base';
+          if (isPriceCloserToSub && subUnitName) effectiveUnit = subUnitName;
+        } else {
+          effectiveUnitType = isPriceCloserToSub ? 'sub' : ((item.unitType === 'base' || item.unitType === 'sub') ? item.unitType : 'base');
+          if (effectiveUnitType === 'sub' && subUnitName && !effectiveUnit) effectiveUnit = subUnitName;
+        }
+      } else {
+        effectiveUnitType = isPriceCloserToSub ? 'sub' : ((item.unitType === 'base' || item.unitType === 'sub') ? item.unitType : 'base');
+        effectiveUnit = effectiveUnitType === 'sub' ? (subUnitName || 'Pcs') : (unitName || 'Unit');
+      }
+
+      return {
+        ...item,
+        unitName: effectiveUnit,
+        unit: effectiveUnit,
+        unitType: effectiveUnitType,
+        baseUnitName: unitName,
+        brandName: item.brandName ?? brandName,
+        subUnitName: item.subUnitName ?? subUnitName,
+        conversionRate: cRate,
+        product: {
+          ...prod,
+          unitName,
+          baseUnitName: unitName,
+          brandName,
+          subUnitName,
+          categoryName,
+          subCategoryName,
+        },
+      };
+    });
+
+    return {
+      ...purchase,
+      items: formattedItems,
+    };
   }
 
   async findAll(query?: any) {
@@ -390,21 +479,17 @@ export class PurchasesService {
       hasPagination ? this.prisma.purchase.count({ where }) : Promise.resolve(0),
       this.prisma.purchase.findMany({
         where,
-        include: {
-          supplier: true,
-          warehouse: true,
-          branch: true,
-          items: { include: { product: true } },
-          payments: { include: { payment: true } },
-        },
+        include: this.purchaseInclude,
         orderBy: { id: "desc" },
         ...(hasPagination ? { skip, take: limit } : {}),
       }),
     ]);
 
+    const mapped = purchases.map((purchase) => this.formatPurchase(purchase));
+
     if (hasPagination) {
       return {
-        data: purchases,
+        data: mapped,
         total,
         page,
         limit,
@@ -412,7 +497,7 @@ export class PurchasesService {
       };
     }
 
-    return purchases;
+    return mapped;
   }
 
   async findOne(id: any) {
@@ -434,18 +519,12 @@ export class PurchasesService {
           { invoiceNumber: idStr },
         ],
       },
-      include: {
-        supplier: true,
-        warehouse: true,
-        branch: true,
-        items: { include: { product: true } },
-        payments: { include: { payment: true } },
-      },
+      include: this.purchaseInclude,
     });
     if (!item) {
       throw new NotFoundException("Purchase not found");
     }
-    return item;
+    return this.formatPurchase(item);
   }
 
   async update(id: any, updatePurchaseDto: UpdatePurchaseDto) {
@@ -931,13 +1010,7 @@ export class PurchasesService {
       const updated = await tx.purchase.update({
         where: { id: targetPurchaseId },
         data: updateData,
-        include: {
-          items: { include: { product: true } },
-          supplier: true,
-          warehouse: true,
-          branch: true,
-          payments: { include: { payment: true } },
-        },
+        include: this.purchaseInclude,
       });
 
       if (existing.supplierId) {
@@ -951,9 +1024,9 @@ export class PurchasesService {
     });
 
     try {
-      return await this.findOne(created.id);
+      return await this.findOne(targetPurchaseId);
     } catch (_) {
-      return created;
+      return this.formatPurchase(created);
     }
   }
 
