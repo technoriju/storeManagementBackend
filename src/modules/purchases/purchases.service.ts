@@ -19,7 +19,7 @@ export class PurchasesService {
         const prodId = BigInt(item.productId);
         const product = await tx.product.findUnique({
           where: { id: prodId },
-          include: { productUnits: true },
+          include: { productUnits: { include: { unit: true } } },
         });
         if (!product) throw new NotFoundException(`Product ${item.productId} not found`);
 
@@ -31,13 +31,25 @@ export class PurchasesService {
           }
 
           let puId = item.productUnitId ? BigInt(item.productUnitId) : null;
-          let pu = puId ? await tx.productUnit.findUnique({ where: { id: puId } }) : null;
+          let pu: any = puId ? await tx.productUnit.findUnique({ where: { id: puId }, include: { unit: true } }) : null;
+          if (pu && (pu.deletedAt || (pu as any).unit?.deletedAt)) {
+            pu = null;
+            puId = null;
+          }
 
           if (!pu && (item as any).unitType) {
-            // Find or create product unit that matches targetFactor
-            pu = product.productUnits?.find(u => Number(u.conversionFactor) === targetFactor)
-              || product.productUnits?.find(u => u.unitId === (product.baseUnitId || 1))
-              || (product.productUnits && product.productUnits.length > 0 ? product.productUnits[0] : null);
+            const activePUs = (product.productUnits || []).filter((u: any) => !u.deletedAt && !u.unit?.deletedAt);
+            const baseUnitMatch = activePUs.find((u: any) => u.unitId === (product.baseUnitId || 1));
+            const nameMatch = (item as any).unit
+              ? activePUs.find((u: any) => u.unit?.name?.toLowerCase() === String((item as any).unit).trim().toLowerCase() || u.unit?.shortName?.toLowerCase() === String((item as any).unit).trim().toLowerCase())
+              : null;
+            const factorMatch = activePUs.find((u: any) => Number(u.conversionFactor) === targetFactor);
+
+            if ((item as any).unitType === 'base') {
+              pu = nameMatch || baseUnitMatch || factorMatch || (activePUs.length > 0 ? activePUs[0] : null);
+            } else {
+              pu = nameMatch || factorMatch || (activePUs.length > 0 ? activePUs[0] : null);
+            }
             if (!pu) {
               const targetUnitId = product.baseUnitId || 1;
               const existingUnit = await tx.productUnit.findFirst({
@@ -402,7 +414,11 @@ export class PurchasesService {
       const uPrice = Number(item.unitPrice || item.unitCost || 0);
       const isPriceCloserToSub = Boolean(cRate > 1 && subUnitName && baseRef > 0 && Math.abs(uPrice - subRef) < Math.abs(uPrice - baseRef));
 
-      let effectiveUnit = item.unit || item.unitName || item.productUnit?.unit?.name || null;
+      const puUnitName = (!item.productUnit?.unit?.deletedAt && !item.productUnit?.deletedAt) ? item.productUnit?.unit?.name : null;
+      let effectiveUnit = item.unit || item.unitName || puUnitName || null;
+      if (effectiveUnit && effectiveUnit.trim().toLowerCase() === 'piece' && unitName && unitName.trim().toLowerCase() === 'pices') {
+        effectiveUnit = unitName;
+      }
       let effectiveUnitType: 'base' | 'sub' | null = null;
 
       if (effectiveUnit) {
@@ -480,7 +496,11 @@ export class PurchasesService {
       this.prisma.purchase.findMany({
         where,
         include: this.purchaseInclude,
-        orderBy: { id: "desc" },
+        orderBy: [
+          { purchaseDate: "desc" },
+          { createdAt: "desc" },
+          { id: "desc" },
+        ],
         ...(hasPagination ? { skip, take: limit } : {}),
       }),
     ]);
@@ -590,7 +610,7 @@ export class PurchasesService {
           const prodId = BigInt(item.productId);
           const product = await tx.product.findUnique({
             where: { id: prodId },
-            include: { productUnits: true },
+            include: { productUnits: { include: { unit: true } } },
           });
           if (!product) throw new NotFoundException(`Product ${item.productId} not found`);
 
@@ -602,13 +622,25 @@ export class PurchasesService {
           }
 
           let puId = item.productUnitId ? BigInt(item.productUnitId) : null;
-          let pu = puId ? await tx.productUnit.findUnique({ where: { id: puId } }) : null;
+          let pu: any = puId ? await tx.productUnit.findUnique({ where: { id: puId }, include: { unit: true } }) : null;
+          if (pu && (pu.deletedAt || (pu as any).unit?.deletedAt)) {
+            pu = null;
+            puId = null;
+          }
 
           if (!pu && (item as any).unitType) {
-            // Find or create product unit that matches targetFactor
-            pu = product.productUnits?.find(u => Number(u.conversionFactor) === targetFactor)
-              || product.productUnits?.find(u => u.unitId === (product.baseUnitId || 1))
-              || (product.productUnits && product.productUnits.length > 0 ? product.productUnits[0] : null);
+            const activePUs = (product.productUnits || []).filter((u: any) => !u.deletedAt && !u.unit?.deletedAt);
+            const baseUnitMatch = activePUs.find((u: any) => u.unitId === (product.baseUnitId || 1));
+            const nameMatch = (item as any).unit
+              ? activePUs.find((u: any) => u.unit?.name?.toLowerCase() === String((item as any).unit).trim().toLowerCase() || u.unit?.shortName?.toLowerCase() === String((item as any).unit).trim().toLowerCase())
+              : null;
+            const factorMatch = activePUs.find((u: any) => Number(u.conversionFactor) === targetFactor);
+
+            if ((item as any).unitType === 'base') {
+              pu = nameMatch || baseUnitMatch || factorMatch || (activePUs.length > 0 ? activePUs[0] : null);
+            } else {
+              pu = nameMatch || factorMatch || (activePUs.length > 0 ? activePUs[0] : null);
+            }
             if (!pu) {
               const targetUnitId = product.baseUnitId || 1;
               const existingUnit = await tx.productUnit.findFirst({
