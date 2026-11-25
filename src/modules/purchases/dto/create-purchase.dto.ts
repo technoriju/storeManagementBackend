@@ -126,5 +126,9 @@ export class CreatePurchaseDto {
   @IsOptional()
   @IsNumber()
   balanceAdjustment?: number;
+
+  @IsOptional()
+  @IsString()
+  clientRequestId?: string;
 }
 

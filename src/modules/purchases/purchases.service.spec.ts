@@ -435,4 +435,163 @@ describe("PurchasesService - Delete and Update Stock Adjustments", () => {
       });
     });
   });
+
+  describe("Phase 1: Idempotency & Duplicate Prevention", () => {
+    it("should return existing purchase and skip writes when clientRequestId already exists", async () => {
+      const existingPurchase = {
+        id: 501n,
+        invoiceNumber: "PUR-501",
+        clientRequestId: "req_duplicate_test_1",
+        grandTotal: 1000,
+        supplierId: 5,
+        items: [],
+      };
+
+      mockPrisma.purchase.findFirst.mockResolvedValue(existingPurchase);
+
+      const createDto: any = {
+        supplierId: 5,
+        warehouseId: 1,
+        purchaseDate: new Date().toISOString(),
+        grandTotal: 1000,
+        paid: 0,
+        clientRequestId: "req_duplicate_test_1",
+        items: [
+          {
+            productId: "10",
+            quantity: 5,
+            unitPrice: 200,
+            total: 1000,
+          },
+        ],
+      };
+
+      const result = await service.create(createDto);
+
+      expect(mockPrisma.purchase.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            clientRequestId: "req_duplicate_test_1",
+            deletedAt: null,
+          }),
+        })
+      );
+      // Ensure $transaction was skipped completely
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+      expect(result).toBeDefined();
+    });
+
+    it("should handle race condition unique constraint error (P2002) and return existing purchase", async () => {
+      // First check returns null (simulating concurrent window)
+      mockPrisma.purchase.findFirst.mockResolvedValueOnce(null);
+
+      // Transaction throws P2002 unique constraint error
+      const p2002Error: any = new Error("Unique constraint failed on the fields: (`clientRequestId`)");
+      p2002Error.code = "P2002";
+      mockPrisma.$transaction.mockRejectedValueOnce(p2002Error);
+
+      const existingPurchase = {
+        id: 502n,
+        invoiceNumber: "PUR-502",
+        clientRequestId: "req_duplicate_race_1",
+        grandTotal: 500,
+        supplierId: 5,
+        items: [],
+      };
+      // Check in catch block and subsequent findOne return the existing purchase
+      mockPrisma.purchase.findFirst.mockResolvedValue(existingPurchase);
+
+      const createDto: any = {
+        supplierId: 5,
+        warehouseId: 1,
+        purchaseDate: new Date().toISOString(),
+        grandTotal: 500,
+        paid: 0,
+        clientRequestId: "req_duplicate_race_1",
+        items: [
+          {
+            productId: "10",
+            quantity: 1,
+            unitPrice: 500,
+            total: 500,
+          },
+        ],
+      };
+
+      const result = await service.create(createDto);
+
+      expect(mockPrisma.purchase.findFirst).toHaveBeenCalledTimes(3);
+      expect(result).toBeDefined();
+    });
+
+    it("should pass clientRequestId to tx.purchase.create and create only one purchase on retry 3 times", async () => {
+      mockTx.product.findUnique.mockResolvedValue({
+        id: 10n,
+        baseUnitId: 1,
+        productUnits: [{ id: 1n, unitId: 1, conversionFactor: 1 }],
+      });
+      mockTx.productUnit.findUnique.mockResolvedValue({ id: 1n, unitId: 1, conversionFactor: 1 });
+      mockTx.warehouse.findUnique.mockResolvedValue({ id: 1 });
+      mockTx.supplier = {
+        findUnique: jest.fn().mockResolvedValue({ id: 5, outstandingBalance: 0, payments: [], purchases: [] }),
+        update: jest.fn(),
+      };
+      mockTx.stockBalance.findUnique.mockResolvedValue({ id: 50n, quantity: 10 });
+      mockTx.payment.create.mockResolvedValue({ id: 101n, amount: 0 });
+
+      const createdPurchase = {
+        id: 503n,
+        invoiceNumber: "PUR-503",
+        clientRequestId: "req_retry_3_times",
+        grandTotal: 1000,
+        supplierId: 5,
+        items: [],
+      };
+      mockTx.purchase.create.mockResolvedValue(createdPurchase);
+
+      const createDto: any = {
+        supplierId: 5,
+        warehouseId: 1,
+        purchaseDate: new Date().toISOString(),
+        grandTotal: 1000,
+        paid: 0,
+        clientRequestId: "req_retry_3_times",
+        items: [
+          {
+            productId: "10",
+            quantity: 5,
+            unitPrice: 200,
+            total: 1000,
+          },
+        ],
+      };
+
+      // 1st call: not existing yet, creates
+      mockPrisma.purchase.findFirst.mockResolvedValueOnce(null);
+      // findOne lookup inside create
+      mockPrisma.purchase.findFirst.mockResolvedValueOnce(createdPurchase);
+      await service.create(createDto);
+
+      expect(mockTx.purchase.create).toHaveBeenCalledTimes(1);
+      expect(mockTx.purchase.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            clientRequestId: "req_retry_3_times",
+          }),
+        })
+      );
+
+      // Subsequent calls return existingPurchase for both clientRequestId check and findOne
+      mockPrisma.purchase.findFirst.mockResolvedValue(createdPurchase);
+
+      // 2nd call: already exists
+      await service.create(createDto);
+
+      // 3rd call: already exists
+      await service.create(createDto);
+
+      // Verify tx.purchase.create was called ONLY ONCE across all 3 calls!
+      expect(mockTx.purchase.create).toHaveBeenCalledTimes(1);
+    });
+  });
 });

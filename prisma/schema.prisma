@@ -442,6 +442,7 @@ model Supplier {
 // TRANSACTIONS
 // ==========================================
 
+
 model Purchase {
   id            BigInt   @id @default(autoincrement())
   branchId      Int?
@@ -468,6 +469,7 @@ model Purchase {
   deletedAt DateTime?
   version   Int       @default(1)
   deviceId  String?
+  clientRequestId String? @unique
 
   branch    Branch?           @relation(fields: [branchId], references: [id])
   warehouse Warehouse?        @relation(fields: [warehouseId], references: [id])
