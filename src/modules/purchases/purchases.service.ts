@@ -10,9 +10,29 @@ export class PurchasesService {
   constructor(private prisma: PrismaService) {}
 
   async create(createPurchaseDto: CreatePurchaseDto) {
-    const { items, paymentAmount, paymentMethod, advancePayment, showPreviousBalance, previousDue, balanceAdjustment, supplierName, ...purchaseData } = createPurchaseDto;
+    const { items, paymentAmount, paymentMethod, advancePayment, showPreviousBalance, previousDue, balanceAdjustment, supplierName, clientRequestId, ...purchaseData } = createPurchaseDto;
 
-    const created = await this.prisma.$transaction(async (tx) => {
+    // Backend uniqueness protection for repeated create requests
+    if (clientRequestId) {
+      const existing = await this.prisma.purchase.findFirst({
+        where: {
+          clientRequestId,
+          deletedAt: null,
+        },
+        include: this.purchaseInclude,
+      });
+      if (existing) {
+        try {
+          return await this.findOne(existing.id);
+        } catch (_) {
+          return this.formatPurchase(existing);
+        }
+      }
+    }
+
+    let created: any;
+    try {
+      created = await this.prisma.$transaction(async (tx) => {
       // 1. Resolve product units and quantities
       const resolvedItems: any[] = [];
       for (const item of items) {
@@ -165,6 +185,7 @@ export class PurchasesService {
       const purchase = await tx.purchase.create({
         data: {
           ...purchaseData,
+          clientRequestId: clientRequestId || null,
           branchId: resolvedBranchId,
           warehouseId: resolvedWarehouseId,
           supplierId: resolvedSupplierId,
@@ -362,6 +383,25 @@ export class PurchasesService {
 
       return purchase;
     });
+    } catch (err: any) {
+      if (clientRequestId && (err?.code === 'P2002' || err?.message?.includes('clientRequestId') || err?.message?.includes('Unique constraint'))) {
+        const existing = await this.prisma.purchase.findFirst({
+          where: {
+            clientRequestId,
+            deletedAt: null,
+          },
+          include: this.purchaseInclude,
+        });
+        if (existing) {
+          try {
+            return await this.findOne(existing.id);
+          } catch (_) {
+            return this.formatPurchase(existing);
+          }
+        }
+      }
+      throw err;
+    }
 
     try {
       return await this.findOne(created.id);
